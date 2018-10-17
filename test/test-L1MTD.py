@@ -19,7 +19,7 @@ process.load('L1Trigger.TrackFindingTracklet.L1TrackletTracks_cff')
 
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(4000)
+    input = cms.untracked.int32(100)
 )
 
 # Input source

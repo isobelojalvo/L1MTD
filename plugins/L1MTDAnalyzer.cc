@@ -20,6 +20,11 @@
 // system include files
 #include <memory>
 
+// Math Include
+#include "TH1.h"
+#include "TH2.h"
+#include "TTree.h"
+
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/one/EDAnalyzer.h"
@@ -40,6 +45,8 @@
 #include "DataFormats/L1TrackTrigger/interface/TTStub.h"
 #include "DataFormats/L1TrackTrigger/interface/TTTrack.h"
 
+#include "CommonTools/UtilAlgos/interface/TFileService.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
 //
 // class declaration
 //
@@ -68,6 +75,10 @@ class L1MTDAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
       // ----------member data ---------------------------
       edm::EDGetTokenT< std::vector< TTTrack< Ref_Phase2TrackerDigi_ > > > ttTrackToken_; 
       edm::EDGetTokenT<edm::ValueMap<float> > timingValuesToken_;
+      TTree* trackerTree;
+
+      std::vector<double> v_trackPt; 
+      std::vector<double> v_trackEta; 
 };
 
 //
@@ -86,6 +97,10 @@ L1MTDAnalyzer::L1MTDAnalyzer(const edm::ParameterSet& cfg):
   timingValuesToken_( consumes<edm::ValueMap<float> >(cfg.getParameter<edm::InputTag>("timingValuesNominal")))
 {
   usesResource("TFileService");
+  edm::Service<TFileService> fs;
+  trackerTree = fs->make<TTree>("trackerTree", "track information");
+  trackerTree->Branch("track_pt",    &v_trackPt);
+  trackerTree->Branch("track_eta",    &v_trackEta);
 
 }
 		  
@@ -112,6 +127,8 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    edm::Handle< std::vector< TTTrack< Ref_Phase2TrackerDigi_ > > > l1trackHandle;
    iEvent.getByToken(ttTrackToken_, l1trackHandle);
    l1Tracks.clear();
+   v_trackPt.clear();
+   v_trackEta.clear();
 
    edm::Handle<edm::ValueMap<float> > timingValues;
    iEvent.getByToken(timingValuesToken_,timingValues);
@@ -123,9 +140,11 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
        edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > ptr(l1trackHandle, track_index);
        double value = (*timingValues)[ptr];
        std::cout<<"value: "<< value<<std::endl;
-       //double pt  = ptr->getMomentum().perp();
-       //double eta = ptr->getMomentum().eta();
-       
+       double pt  = ptr->getMomentum().perp();
+       double eta = ptr->getMomentum().eta();
+       v_trackPt.push_back(pt);
+       v_trackEta.push_back(eta);
+
        //only using tracks with eta less than 1.5 and pt greater than 2.5 GeV
        //if(abs(eta)<1.5 && pt > 2.5)
        l1Tracks.push_back(l1trackHandle->at(track_index));       
@@ -134,7 +153,9 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    
    std::sort(l1Tracks.begin(), l1Tracks.end(), [](TTTrack< Ref_Phase2TrackerDigi_ > i,TTTrack< Ref_Phase2TrackerDigi_ > j){return(i.getMomentum().perp() > j.getMomentum().perp());});   
    
-
+   // ***. Fill tree
+   trackerTree->Fill();
+   
 }
 
 
