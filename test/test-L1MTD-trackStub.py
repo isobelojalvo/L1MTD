@@ -139,15 +139,18 @@ process.L1PFTaus = cms.Path(process.L1PFTauProducer)
 ##the analyzer
 process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDAnalyzer',
                                        L1TrackInputTag  = cms.InputTag("TTTracksFromTracklet", "Level1TTTracks"),            
-                                       timingValuesNominal = cms.InputTag("ttTrackTimeValueMapProducer","TTTracksFromTrackletL1PerfectResolutionModel")
+                                       timingValuesNominal = cms.InputTag("ttTrackTimeValueMapProducer","TTTracksFromTrackletL1PerfectResolutionModel"),
+                                       L1StubInputTag = cms.InputTag("TTStubsFromPhase2TrackerDigis","StubAccepted"),
+                                       MCTruthStubInputTag = cms.InputTag("TTStubAssociatorFromPixelDigis", "StubAccepted"),
+                                       saveStubs = cms.bool(True)
                                        )
 
 process.analyzer = cms.Path(process.L1MTDAnalyzer)
 
 
 process.TFileService = cms.Service("TFileService", 
-   fileName = cms.string("analyzer.root"), 
-   closeFileFast = cms.untracked.bool(True)
+                                   fileName = cms.string("analyzer.root"), 
+                                   closeFileFast = cms.untracked.bool(True)
 )
 
 # Schedule definition
