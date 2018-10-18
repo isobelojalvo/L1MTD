@@ -79,6 +79,9 @@ class L1MTDAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
 
       std::vector<double> v_trackPt; 
       std::vector<double> v_trackEta; 
+
+      TH1F* track_pt;
+
 };
 
 //
@@ -102,6 +105,8 @@ L1MTDAnalyzer::L1MTDAnalyzer(const edm::ParameterSet& cfg):
   trackerTree->Branch("track_pt",    &v_trackPt);
   trackerTree->Branch("track_eta",    &v_trackEta);
 
+  track_pt             = fs->make<TH1F>( "track_pt"  , "p_{t}", 200,  0., 200. );
+
 }
 		  
 
@@ -122,6 +127,8 @@ L1MTDAnalyzer::~L1MTDAnalyzer()
 void
 L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
+  std::cout << " !!! Running L1MTDAnalyzer::analyze() !!!" << std::endl;
+
    using namespace edm;
    std::vector<TTTrack< Ref_Phase2TrackerDigi_ > > l1Tracks;
    edm::Handle< std::vector< TTTrack< Ref_Phase2TrackerDigi_ > > > l1trackHandle;
@@ -163,6 +170,8 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 void
 L1MTDAnalyzer::beginJob()
 {
+  std::cout << "STARTING JOB!!!" << std::endl;
+
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
