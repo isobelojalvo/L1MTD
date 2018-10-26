@@ -86,6 +86,7 @@ class L1MTDAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
       // ----------member data ---------------------------
       edm::EDGetTokenT< std::vector< TTTrack< Ref_Phase2TrackerDigi_ > > > ttTrackToken_; 
       edm::EDGetTokenT<edm::ValueMap<float> > timingValuesToken_;
+      edm::EDGetTokenT<edm::ValueMap<float> > timingValuesSmearedToken_;
       bool saveStubs; // option to save also stubs in the ntuples (makes them large...) // BBT 10-18-18
       edm::EDGetTokenT< edmNew::DetSetVector< TTStub< Ref_Phase2TrackerDigi_ > > > ttStubToken_;   // BBT 10-18-18
       edm::EDGetTokenT< TTStubAssociationMap< Ref_Phase2TrackerDigi_ > > ttStubMCTruthToken_;   // BBT 10-18-18
@@ -102,6 +103,7 @@ class L1MTDAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
       std::vector<double> v_trackPt; 
       std::vector<double> v_trackEta; 
       std::vector<double> v_trackTime; 
+      std::vector<double> v_trackTime_smeared; 
       std::vector<double> v_trackTime_PVcorrected; 
 
       // Vertex 10-26-18 BBT
@@ -165,7 +167,8 @@ class L1MTDAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
 //
 L1MTDAnalyzer::L1MTDAnalyzer(const edm::ParameterSet& cfg):
   ttTrackToken_(  consumes< std::vector< TTTrack < Ref_Phase2TrackerDigi_ > > >(cfg.getParameter<edm::InputTag>("L1TrackInputTag"))),
-  timingValuesToken_( consumes<edm::ValueMap<float> >(cfg.getParameter<edm::InputTag>("timingValuesNominal")))
+  timingValuesToken_( consumes<edm::ValueMap<float> >(cfg.getParameter<edm::InputTag>("timingValuesNominal"))),
+  timingValuesSmearedToken_( consumes<edm::ValueMap<float> >(cfg.getParameter<edm::InputTag>("timingValuesSmeared")))
 {
   // track stubs, BBT 10-18-18
   saveStubs = cfg.getParameter< bool >("saveStubs");
@@ -185,6 +188,7 @@ L1MTDAnalyzer::L1MTDAnalyzer(const edm::ParameterSet& cfg):
   trackerTree->Branch("track_pt",    &v_trackPt);
   trackerTree->Branch("track_eta",    &v_trackEta);
   trackerTree->Branch("track_time",    &v_trackTime);
+  trackerTree->Branch("track_time_smeared",    &v_trackTime_smeared);
   trackerTree->Branch("track_time_PVcorrected",    &v_trackTime_PVcorrected);
 
   trackerTree->Branch("vertex_X",    &d_vertexX);
@@ -251,7 +255,9 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
    // Timing
    edm::Handle<edm::ValueMap<float> > timingValues;
+   edm::Handle<edm::ValueMap<float> > timingValues_smeared;
    iEvent.getByToken(timingValuesToken_,timingValues);
+   iEvent.getByToken(timingValuesSmearedToken_,timingValues_smeared);
 
    // pair stuff
    std::vector< std::pair < TTTrack< Ref_Phase2TrackerDigi_ >, double > > l1Tracks_pair;
@@ -270,6 +276,7 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    v_trackPt.clear();
    v_trackEta.clear();
    v_trackTime.clear();
+   v_trackTime_smeared.clear();
    v_trackTime_PVcorrected.clear();
    d_vertexTime = -999;
    d_vertexX = -999;
@@ -318,6 +325,7 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
        
        edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > ptr(l1trackHandle, track_index);
        double value = (*timingValues)[ptr];
+       double value_smeared = (*timingValues_smeared)[ptr];
        
        //if (track_index = 0)
        //std::cout << "unsorted " << track_index << "th l1track, value: "<< value << " , pt: " << ptr->getMomentum().perp() <<std::endl;
@@ -326,7 +334,8 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
        v_trackPt.push_back(pt);
        v_trackEta.push_back(eta);
        v_trackTime.push_back( value );     
-       v_trackTime_PVcorrected.push_back( value - (*primarySimVertexTime) );     
+       v_trackTime_smeared.push_back( value_smeared );     
+       v_trackTime_PVcorrected.push_back( value_smeared - (*primarySimVertexTime) );     
        //only using tracks with eta less than 1.5 and pt greater than 2.5 GeV
        //if(abs(eta)<1.5 && pt > 2.5)
        l1Tracks.push_back(l1trackHandle->at(track_index));       

@@ -17,10 +17,10 @@ process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 process.load('L1Trigger.TrackFindingTracklet.L1TrackletTracks_cff')
 
-process.MessageLogger.cerr.FwkReport.reportEvery = 2
+process.MessageLogger.cerr.FwkReport.reportEvery = 10
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(10)
+    input = cms.untracked.int32(300)
 )
 
 # Input source
@@ -151,6 +151,7 @@ process.L1PFTaus = cms.Path(process.L1PFTauProducer)
 process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDAnalyzer',
                                        L1TrackInputTag  = cms.InputTag("TTTracksFromTracklet", "Level1TTTracks"),            
                                        timingValuesNominal = cms.InputTag("ttTrackTimeValueMapProducer","TTTracksFromTrackletL1PerfectResolutionModel"),
+                                       timingValuesSmeared = cms.InputTag("ttTrackTimeValueMapProducer","TTTracksFromTrackletL1ConfigurableFlatResolutionModel"),
                                        L1StubInputTag = cms.InputTag("TTStubsFromPhase2TrackerDigis","StubAccepted"),
                                        MCTruthStubInputTag = cms.InputTag("TTStubAssociatorFromPixelDigis", "StubAccepted"),
                                        saveStubs = cms.bool(True),
