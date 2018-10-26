@@ -19,6 +19,7 @@
 
 // system include files
 #include <memory>
+#include <utility>
 
 // Math Include
 #include "TH1.h"
@@ -90,13 +91,35 @@ class L1MTDAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
       edm::EDGetTokenT< TTStubAssociationMap< Ref_Phase2TrackerDigi_ > > ttStubMCTruthToken_;   // BBT 10-18-18
       edm::InputTag L1StubInputTag; // BBT 10-18-18
       edm::InputTag MCTruthStubInputTag; // BBT 10-18-18
-
-      // --------------- output tree and members ---------------
-      TTree* trackerTree;
+      edm::InputTag primarySimVertexPosTag; // BBT 10-26-18
+      edm::InputTag primarySimVertexTimeTag; // BBT 10-26-18
+      edm::EDGetTokenT< ROOT::Math::PositionVector3D<ROOT::Math::Cartesian3D<float>,ROOT::Math::DefaultCoordinateSystemTag> > primarySimVertexPosToken_;
+      edm::EDGetTokenT< float > primarySimVertexTimeToken_;
+  
+  // --------------- output tree and members ---------------
+  TTree* trackerTree;
   
       std::vector<double> v_trackPt; 
       std::vector<double> v_trackEta; 
+      std::vector<double> v_trackTime; 
+      std::vector<double> v_trackTime_PVcorrected; 
+
+      // Vertex 10-26-18 BBT
+      double d_vertexX; 
+      double d_vertexY; 
+      double d_vertexZ; 
+      double d_vertexTime; 
+
+      // SimHit 10-26-18 BBT
+      std::vector<double> v_simHitX; 
+      std::vector<double> v_simHitY; 
+      std::vector<double> v_simHitZ; 
+      std::vector<double> v_simHitTime; 
+
       // ALL stubs
+      double nStubsPerEvent;
+      double nStubsPerEvent_2p5;
+      double nStubsPerEvent_5;
       std::vector<float>* m_allstub_x;
       std::vector<float>* m_allstub_y;
       std::vector<float>* m_allstub_z;
@@ -118,6 +141,11 @@ class L1MTDAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
 
       std::vector<int>* m_allstub_genuine;
     
+      // stubs matched to simHits, BBT 10-24-18
+      std::vector<float>* m_allstub_matchSimHit_pt; 
+      std::vector<float>* m_allstub_matchSimHit_eta;
+      std::vector<float>* m_allstub_matchSimHit_phi;
+
 
       // --------------- histograms ---------------
       TH1F* track_pt;
@@ -145,6 +173,10 @@ L1MTDAnalyzer::L1MTDAnalyzer(const edm::ParameterSet& cfg):
   MCTruthStubInputTag = cfg.getParameter<edm::InputTag>("MCTruthStubInputTag");
   ttStubToken_ = consumes< edmNew::DetSetVector< TTStub< Ref_Phase2TrackerDigi_ > > >(L1StubInputTag);
   ttStubMCTruthToken_ = consumes< TTStubAssociationMap< Ref_Phase2TrackerDigi_ > >(MCTruthStubInputTag);
+  primarySimVertexPosTag = cfg.getParameter<edm::InputTag>("genParticles_xyz");
+  primarySimVertexTimeTag = cfg.getParameter<edm::InputTag>("genParticles_t");
+  primarySimVertexPosToken_ = consumes< ROOT::Math::PositionVector3D<ROOT::Math::Cartesian3D<float>,ROOT::Math::DefaultCoordinateSystemTag> >(primarySimVertexPosTag);
+  primarySimVertexTimeToken_ = consumes< float >(primarySimVertexTimeTag);
 
   // output tree and members
   usesResource("TFileService");
@@ -152,6 +184,17 @@ L1MTDAnalyzer::L1MTDAnalyzer(const edm::ParameterSet& cfg):
   trackerTree = fs->make<TTree>("trackerTree", "track information");
   trackerTree->Branch("track_pt",    &v_trackPt);
   trackerTree->Branch("track_eta",    &v_trackEta);
+  trackerTree->Branch("track_time",    &v_trackTime);
+  trackerTree->Branch("track_time_PVcorrected",    &v_trackTime_PVcorrected);
+
+  trackerTree->Branch("vertex_X",    &d_vertexX);
+  trackerTree->Branch("vertex_Y",    &d_vertexY);
+  trackerTree->Branch("vertex_Z",    &d_vertexZ);
+  trackerTree->Branch("vertex_time", &d_vertexTime);
+
+  trackerTree->Branch("nStubsPerEvent",    &nStubsPerEvent);
+  trackerTree->Branch("nStubsPerEvent_2p5",    &nStubsPerEvent_2p5);
+  trackerTree->Branch("nStubsPerEvent_5",    &nStubsPerEvent_5);
 
   // histograms
   track_pt             = fs->make<TH1F>( "track_pt"  , "p_{t}", 200,  0., 200. );
@@ -176,10 +219,11 @@ L1MTDAnalyzer::~L1MTDAnalyzer()
 void
 L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-  std::cout << " !!! Running L1MTDAnalyzer::analyze() !!!" << std::endl;
+  //std::cout << " !!! Running L1MTDAnalyzer::analyze() !!!" << std::endl;
 
    using namespace edm;
    std::vector<TTTrack< Ref_Phase2TrackerDigi_ > > l1Tracks;
+   //std::vector<TTTrack< Ref_Phase2TrackerDigi_ > > l1Tracks_time;
    // L1 tracks
    edm::Handle< std::vector< TTTrack< Ref_Phase2TrackerDigi_ > > > l1trackHandle;
    iEvent.getByToken(ttTrackToken_, l1trackHandle);
@@ -209,13 +253,31 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    edm::Handle<edm::ValueMap<float> > timingValues;
    iEvent.getByToken(timingValuesToken_,timingValues);
 
+   // pair stuff
+   std::vector< std::pair < TTTrack< Ref_Phase2TrackerDigi_ >, double > > l1Tracks_pair;
+
+   // Get vertex info, BBT 10-26-18
+   edm::Handle< ROOT::Math::PositionVector3D<ROOT::Math::Cartesian3D<float>,ROOT::Math::DefaultCoordinateSystemTag> > primarySimVertexPos;
+   iEvent.getByToken(primarySimVertexPosToken_, primarySimVertexPos);
+   edm::Handle< float > primarySimVertexTime;
+   iEvent.getByToken(primarySimVertexTimeToken_, primarySimVertexTime);
+
    // -----------------------------------------------------------------------------------------------
 
    // variables for output
    l1Tracks.clear();
+   //l1Tracks_time.clear();
    v_trackPt.clear();
    v_trackEta.clear();
-
+   v_trackTime.clear();
+   v_trackTime_PVcorrected.clear();
+   d_vertexTime = -999;
+   d_vertexX = -999;
+   d_vertexY = -999;
+   d_vertexZ = -999;
+   nStubsPerEvent=0;
+   nStubsPerEvent_2p5=0;
+   nStubsPerEvent_5=0;
 
    if (saveStubs) {
      m_allstub_x->clear();
@@ -235,31 +297,69 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
      m_allstub_matchTP_pt->clear();
      m_allstub_matchTP_eta->clear();
      m_allstub_matchTP_phi->clear();
+     
+     // match SimHit, BBT 10-24-18
+     m_allstub_matchSimHit_pt->clear();
+     m_allstub_matchSimHit_eta->clear();
+     m_allstub_matchSimHit_phi->clear();
 
      m_allstub_genuine->clear();
    }
 
+   // VERTEX stuff, BBT 10-26-18
+   d_vertexTime = (*primarySimVertexTime) ;
+   d_vertexX    = (*primarySimVertexPos).X() ;
+   d_vertexY    = (*primarySimVertexPos).Y() ;
+   d_vertexZ    = (*primarySimVertexPos).Z() ;
+   
    //Find and sort the tracks
    for(size_t track_index=0; track_index<l1trackHandle->size(); ++track_index)
      {
        
        edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > ptr(l1trackHandle, track_index);
        double value = (*timingValues)[ptr];
-       std::cout<<"value: "<< value<<std::endl;
+       
+       //if (track_index = 0)
+       //std::cout << "unsorted " << track_index << "th l1track, value: "<< value << " , pt: " << ptr->getMomentum().perp() <<std::endl;
        double pt  = ptr->getMomentum().perp();
        double eta = ptr->getMomentum().eta();
        v_trackPt.push_back(pt);
        v_trackEta.push_back(eta);
-
+       v_trackTime.push_back( value );     
+       v_trackTime_PVcorrected.push_back( value - (*primarySimVertexTime) );     
        //only using tracks with eta less than 1.5 and pt greater than 2.5 GeV
        //if(abs(eta)<1.5 && pt > 2.5)
        l1Tracks.push_back(l1trackHandle->at(track_index));       
-       
+       //l1Tracks_time.push_back(value);       
+
+       l1Tracks_pair.push_back( std::make_pair(l1trackHandle->at(track_index), value) );
      }
+
+   //std::cout << "0th l1Track before sorting: " << l1Tracks.at(0).getMomentum().perp() << std::endl;
+   //std::cout << "1st l1Track before sorting: " << l1Tracks.at(1).getMomentum().perp() << std::endl;
+
+
+   //std::sort(l1Tracks.begin(), l1Tracks.end(), [](TTTrack< Ref_Phase2TrackerDigi_ > i,TTTrack< Ref_Phase2TrackerDigi_ > j){return(i.getMomentum().perp() > j.getMomentum().perp());});   
+
+
+   //std::sort(l1Tracks_pair.begin(), l1Tracks_pair.end(), [](TTTrack< Ref_Phase2TrackerDigi_ > i,TTTrack< Ref_Phase2TrackerDigi_ > j){return(i.getMomentum().perp() > j.getMomentum().perp());});   
+   //std::cout << "0th l1Track after sorting: "  << l1Tracks.at(0).getMomentum().perp() << std::endl;
+   //std::cout << "1st l1Track before sorting: " << l1Tracks.at(1).getMomentum().perp() << std::endl;
    
-   std::sort(l1Tracks.begin(), l1Tracks.end(), [](TTTrack< Ref_Phase2TrackerDigi_ > i,TTTrack< Ref_Phase2TrackerDigi_ > j){return(i.getMomentum().perp() > j.getMomentum().perp());});   
+   /*
+   // store pt ordered l1Tracks
+   for(unsigned int i = 0; i < l1Tracks.size(); i++) {
+     v_trackPt.push_back( l1Tracks.at(i).getMomentum().perp() );
+     v_trackEta.push_back( l1Tracks.at(i).getMomentum().eta() );
 
+     edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > ptr(l1trackHandle, i);
+     double value = (*timingValues)[ptr];
+     v_trackTime.push_back( value );     
+     std::cout<<"sorted " << i << "th l1track, value: "<< value << " , pt: " << l1Tracks.at(i).getMomentum().perp() <<std::endl;
 
+     //std::cout<<"2sorted " << i << "th l1track, value: "<< l1Tracks_pair.at(i).second << " , pt: " << l1Tracks.at(i).getMomentum().perp() <<std::endl;
+   }
+   */
 
 
    // ----------------------------------------------------------------------------------------------
@@ -285,6 +385,8 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
        
        // loop over stubs
        for ( auto stubIter = stubs.begin();stubIter != stubs.end();++stubIter ) {
+	 nStubsPerEvent++;
+
 	 edm::Ref< edmNew::DetSetVector< TTStub< Ref_Phase2TrackerDigi_  > >, TTStub< Ref_Phase2TrackerDigi_  > >
 	   tempStubPtr = edmNew::makeRefTo( TTStubHandle, stubIter );
 	 
@@ -350,7 +452,10 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	   myTP_eta = my_tp->p4().eta();
 	   myTP_phi = my_tp->p4().phi();
 	 }
-	 
+
+	 if (myTP_pt > 2.5) nStubsPerEvent_2p5++;
+	 if (myTP_pt > 5) nStubsPerEvent_5++;
+
 	 m_allstub_matchTP_pdgid->push_back(myTP_pdgid);
 	 m_allstub_matchTP_pt->push_back(myTP_pt);
 	 m_allstub_matchTP_eta->push_back(myTP_eta);
@@ -360,10 +465,26 @@ L1MTDAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	 if (MCTruthTTStubHandle->isGenuine(tempStubPtr)) tmp_stub_genuine = 1;
 	 
 	 m_allstub_genuine->push_back(tmp_stub_genuine);
+	
+	 // try to match stubs to SimHits, BBT 10-24-18
+	 for(unsigned int track_idx = 0; track_idx < l1Tracks.size(); track_idx++) {
+	   double etaTrack = l1Tracks.at(track_idx).getMomentum().eta();
+	   double phiTrack = l1Tracks.at(track_idx).getMomentum().phi();
+	   //double etaStub  = posStub.eta();
+	   //double phiStub  = posStub.phi();
+	   double etaStub  = myTP_eta;
+	   double phiStub  = myTP_phi;
+	   double deltaR   = sqrt( (etaTrack - etaStub)*(etaTrack - etaStub) + (phiTrack - phiStub)*(phiTrack - phiStub));
+	   if (deltaR < 0.1) {
+	     m_allstub_matchSimHit_pt->push_back(myTP_pt);
+	     m_allstub_matchSimHit_eta->push_back(myTP_eta);
+	     m_allstub_matchSimHit_phi->push_back(myTP_phi);
+	   }
+	 }
 	 
-       }
+       } // end loop over stubs
      }
-   }
+   } // end saveStubs
    
    // ***. Fill tree
    trackerTree->Fill();
@@ -397,6 +518,10 @@ L1MTDAnalyzer::beginJob()
   m_allstub_matchTP_eta   = new std::vector<float>;
   m_allstub_matchTP_phi = new std::vector<float>;
 
+  m_allstub_matchSimHit_pt    = new std::vector<float>;
+  m_allstub_matchSimHit_eta   = new std::vector<float>;
+  m_allstub_matchSimHit_phi = new std::vector<float>;
+
   m_allstub_genuine = new std::vector<int>;
 
   if (saveStubs) {
@@ -417,6 +542,10 @@ L1MTDAnalyzer::beginJob()
     trackerTree->Branch("allstub_matchTP_pt",    &m_allstub_matchTP_pt);
     trackerTree->Branch("allstub_matchTP_eta",   &m_allstub_matchTP_eta);
     trackerTree->Branch("allstub_matchTP_phi", &m_allstub_matchTP_phi);
+
+    trackerTree->Branch("allstub_matchSimHit_pt",    &m_allstub_matchSimHit_pt);
+    trackerTree->Branch("allstub_matchSimHit_eta",   &m_allstub_matchSimHit_eta);
+    trackerTree->Branch("allstub_matchSimHit_phi", &m_allstub_matchSimHit_phi);
 
     trackerTree->Branch("allstub_genuine", &m_allstub_genuine);
   }
