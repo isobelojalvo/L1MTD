@@ -87,11 +87,11 @@ private:
   
   // ----------member data ---------------------------
   //custom class functions
-  void calculate_charged_iso_sum(l1t::PFCandidate object, Handle< l1t::PFCandidateCollection > pfCands, edm::Handle<edm::ValueMap<float> > timingValues, double time_cut, double deltaR, double deltaZ, double &isoSum, double &isoSumTime);
+  void calculate_charged_iso_sum(l1t::PFCandidate object, int object_index, Handle< l1t::PFCandidateCollection > pfCands, edm::Handle<edm::ValueMap<float> > timingValues, double time_cut, double deltaR, double deltaZ, double &isoSum, double &isoSumTime);
   void fillGenParticleVector(Handle<std::vector<reco::GenParticle> > genParticles, std::vector<reco::GenParticle> &selectedGenParticles,int pdgID);
   //void fillGenTauVector(Handle<std::vector<reco::GenParticle> > genParticles, std::vector<genVisTau> &selectedGenParticles);
-  void fillL1PFCandCollections(Handle<PFCandidateCollection> pfCandidates,PFCandidateCollection &pfElectrons,PFCandidateCollection &pfPhotons,PFCandidateCollection &pfMuons);
-  //void fillL1PFCandCollections(PFCandidateCollection pfCandidates,PFCandidateCollection &pfElectrons,PFCandidateCollection &pfPhotons,PFCandidateCollection &pfMuons);
+  // void fillL1PFCandCollections(Handle<PFCandidateCollection> pfCandidates,PFCandidateCollection &pfElectrons,PFCandidateCollection &pfPhotons,PFCandidateCollection &pfMuons);
+  void fillL1PFCandCollections(Handle<PFCandidateCollection> pfCandidates,PFCandidateCollection &pfElectrons, std::vector<int> & l1PFElectrons_indicies, PFCandidateCollection &pfPhotons, std::vector<int> & l1PFPhotons_indicies, PFCandidateCollection &pfMuons, std::vector<int> &l1PFMuons_indicies);
   void zeroElectronTreeVariables();
   void zeroPhotonTreeVariables();
   void zeroMuonTreeVariables();
@@ -243,6 +243,7 @@ mtdIsoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
   // make the L1 vectors electrons, photons, muons, taus, met 
   l1t::PFCandidateCollection l1PFElectrons, l1PFPhotons, l1PFMuons;
+  std::vector<int> l1PFElectrons_indicies, l1PFPhotons_indicies, l1PFMuons_indicies;
   Handle<L1PFTauCollection> l1PFTaus;
 
   //put l1 met collection here
@@ -283,7 +284,7 @@ mtdIsoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
   //met       // composite object
 
   //Fill Each L1 PF Cand vector with the L1 PFCands Electrons, Photons and Muons
-  fillL1PFCandCollections(l1PFCandidates, l1PFElectrons, l1PFPhotons, l1PFMuons);
+  fillL1PFCandCollections(l1PFCandidates, l1PFElectrons, l1PFElectrons_indicies, l1PFPhotons, l1PFPhotons_indicies, l1PFMuons, l1PFMuons_indicies);
   
   //Fill the Electron Tree
   //for each reco electron 
@@ -302,11 +303,14 @@ mtdIsoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     eleRecoEta = cand->eta();
     eleRecoPhi = cand->phi();
 
+    int idx = 0;
     //Get matched L1 Electron
     for(auto l1Cand : l1PFElectrons){
-      if(reco::deltaR(cand->eta(),cand->phi(),l1Cand.eta(),l1Cand.phi())<0.2){
+      int object_idx = l1PFElectrons_indicies.at(idx);
+      idx++;
+      if(reco::deltaR(cand->eta(),cand->phi(),l1Cand.eta(),l1Cand.phi())<0.1){
 	//calculate iso Sum
-	calculate_charged_iso_sum(l1Cand, l1PFCandidates, timingValues, time_cut_, iso_cone_deltaR_, iso_cone_deltaZ_, isoSum, isoSumTime);
+	calculate_charged_iso_sum(l1Cand, object_idx, l1PFCandidates, timingValues, time_cut_, iso_cone_deltaR_, iso_cone_deltaZ_, isoSum, isoSumTime);
 	eleL1Iso      = isoSum;
 	eleL1Iso_time = isoSumTime;
 	std::cout<<"matched electron found!! eleL1Iso: "<<eleL1Iso<<" eleL1Iso_time: "<<eleL1Iso_time<<std::endl;
@@ -381,21 +385,24 @@ mtdIsoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
     //Zero the tree
     zeroMuonTreeVariables();
-    eleRecoPt  = cand->pt();
-    eleRecoEta = cand->eta();
-    eleRecoPhi = cand->phi();
+    muRecoPt  = cand->pt();
+    muRecoEta = cand->eta();
+    muRecoPhi = cand->phi();
 
+    int idx = 0;
     //Get matched L1 Muon
     for(auto l1Cand : l1PFMuons){
-      if(reco::deltaR(cand->eta(),cand->phi(),l1Cand.eta(),l1Cand.phi())<0.2){
+      int object_idx = l1PFMuons_indicies.at(idx);
+      idx++;
+      if(reco::deltaR(cand->eta(),cand->phi(),l1Cand.eta(),l1Cand.phi())<0.1){
 	//calculate iso Sum
-	calculate_charged_iso_sum(l1Cand, l1PFCandidates, timingValues, time_cut_, iso_cone_deltaR_, iso_cone_deltaZ_, isoSum, isoSumTime);
-	eleL1Iso      = isoSum;
-	eleL1Iso_time = isoSumTime;
-	std::cout<<"matched muon found!! eleL1Iso: "<<eleL1Iso<<" eleL1Iso_time: "<<eleL1Iso_time<<std::endl;
-	eleL1Pt       = l1Cand.pt();
-	eleL1Eta      = l1Cand.eta();
-	eleL1Phi      = l1Cand.phi();
+	calculate_charged_iso_sum(l1Cand, object_idx, l1PFCandidates, timingValues, time_cut_, iso_cone_deltaR_, iso_cone_deltaZ_, isoSum, isoSumTime);
+	muL1Iso      = isoSum;
+	muL1Iso_time = isoSumTime;
+	std::cout<<"matched muon found!! muL1Iso: "<<muL1Iso<<" muL1Iso_time: "<<muL1Iso_time<<std::endl;
+	muL1Pt       = l1Cand.pt();
+	muL1Eta      = l1Cand.eta();
+	muL1Phi      = l1Cand.phi();
 	break;
       }
     }
@@ -403,9 +410,9 @@ mtdIsoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     for(auto genCand : genMuons){
       //matchGen
       if(reco::deltaR(cand->eta(), cand->phi(), genCand.eta(), genCand.phi())<0.1){
-	eleGenPt      = genCand.pt();
-	eleGenEta     = genCand.eta();
-	eleGenPhi     = genCand.phi();
+	muGenPt      = genCand.pt();
+	muGenEta     = genCand.eta();
+	muGenPhi     = genCand.phi();
 	break;
       }
     }
@@ -426,38 +433,51 @@ mtdIsoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     }*/
 }
 
-void mtdIsoAnalyzer::calculate_charged_iso_sum(l1t::PFCandidate object, Handle< l1t::PFCandidateCollection > pfCandidates, edm::Handle<edm::ValueMap<float> > timingValues, double time_cut, double deltaR, double deltaZ, double &isoSum, double &isoSumTime){
+void mtdIsoAnalyzer::calculate_charged_iso_sum(l1t::PFCandidate object, int object_index, Handle< l1t::PFCandidateCollection > pfCandidates, edm::Handle<edm::ValueMap<float> > timingValues, double time_cut, double deltaR, double deltaZ, double &isoSum, double &isoSumTime){
     double iso_sum = 0;
     double iso_sum_time = 0;
-
+    int idx = 0;
     for( PFCandidateCollection::const_iterator pfCand  = pfCandidates->begin();
-                                             pfCand != pfCandidates->end(); 
-                                             ++pfCand){    
+                                               pfCand != pfCandidates->end(); 
+	                                       ++pfCand, ++idx){    
 
-      // first check deltaR match
-      if(reco::deltaR(object.eta(), object.phi(), pfCand->eta(), pfCand->phi()) < deltaR){
-	iso_sum += pfCand->pt();
-	float objectTime = 0;
-	float pfCandTime = 0;
+      if(idx == object_index)
+	continue;
+      
+      //first check if it is a charged candidate
+      if(pfCand->id() == l1t::PFCandidate::Muon || pfCand->id() == l1t::PFCandidate::Electron || pfCand->id() == l1t::PFCandidate::ChargedHadron){
+      
+	// first check deltaR match
+	if(reco::deltaR(object.eta(), object.phi(), pfCand->eta(), pfCand->phi()) < deltaR){
 
-	
-	if(!object.pfTrack().isNull()){
-	  objectTime = (*timingValues)[object.pfTrack()->track()];
-	}
-	if(!pfCand->pfTrack().isNull()){
-	  pfCandTime = (*timingValues)[pfCand->pfTrack()->track()];
-	}
-	//edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > objectTime(pfCand->pfTrack(), track_index);
-	//edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > pfCandTime(object.pfTrack(), track_index);
-
-	//std::cout<<"objectTime: "<<objectTime<<" pfCandTime:"<<pfCandTime<<std::endl;
-	// then check time match
-	if(fabs(objectTime - pfCandTime) < time_cut){
-	  iso_sum_time += pfCand->pt();
+	  if(object.pfTrack().isNull()||pfCand->pfTrack().isNull())
+	    continue;
+	  
+	  if(fabs(object.pfTrack()->track()->getPOCA().z()-pfCand->pfTrack()->track()->getPOCA().z()) < deltaZ){
+	    
+	    iso_sum += pfCand->pt();
+	    float objectTime = 0;
+	    float pfCandTime = 0;
+	    
+	    
+	    if(!object.pfTrack().isNull()){
+	      objectTime = (*timingValues)[object.pfTrack()->track()];
+	    }
+	    if(!pfCand->pfTrack().isNull()){
+	      pfCandTime = (*timingValues)[pfCand->pfTrack()->track()];
+	    }
+	    //edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > objectTime(pfCand->pfTrack(), track_index);
+	  //edm::Ptr< TTTrack< Ref_Phase2TrackerDigi_ > > pfCandTime(object.pfTrack(), track_index);
+	    
+	  //std::cout<<"objectTime: "<<objectTime<<" pfCandTime:"<<pfCandTime<<std::endl;
+	  // then check time match
+	    if(fabs(objectTime - pfCandTime) < time_cut){
+	      iso_sum_time += pfCand->pt();
+	    }
+	  }
 	}
       }
     }
-
     isoSum = iso_sum;
     isoSumTime = iso_sum_time;
 }
@@ -488,16 +508,23 @@ void mtdIsoAnalyzer::fillGenTauVector(Handle<std::vector<reco::GenParticle> > ge
   }
 }
 */
-void mtdIsoAnalyzer::fillL1PFCandCollections(Handle<PFCandidateCollection> pfCandidates,PFCandidateCollection &pfElectrons,PFCandidateCollection &pfPhotons,PFCandidateCollection &pfMuons){
+void mtdIsoAnalyzer::fillL1PFCandCollections(Handle<PFCandidateCollection> pfCandidates,PFCandidateCollection &pfElectrons, std::vector<int> & l1PFElectrons_indicies, PFCandidateCollection &pfPhotons, std::vector<int> & l1PFPhotons_indicies, PFCandidateCollection &pfMuons, std::vector<int> & l1PFMuons_indicies){
+  int index = 0;
   for( PFCandidateCollection::const_iterator l1PFCand  = pfCandidates->begin();
                                              l1PFCand != pfCandidates->end(); 
-                                             ++l1PFCand){    
-    if(l1PFCand->id() == l1t::PFCandidate::Electron)
+       ++l1PFCand, ++index){    
+    if(l1PFCand->id() == l1t::PFCandidate::Electron){
       pfElectrons.push_back(*l1PFCand);
-    if(l1PFCand->id() == l1t::PFCandidate::Photon)
+      l1PFElectrons_indicies.push_back(index);
+    }
+    if(l1PFCand->id() == l1t::PFCandidate::Photon){
       pfPhotons.push_back(*l1PFCand);
-    if(l1PFCand->id() == l1t::PFCandidate::Muon)
+      l1PFPhotons_indicies.push_back(index);
+    }
+    if(l1PFCand->id() == l1t::PFCandidate::Muon){
       pfMuons.push_back(*l1PFCand);
+      l1PFMuons_indicies.push_back(index);
+    }
   }
 }
 
