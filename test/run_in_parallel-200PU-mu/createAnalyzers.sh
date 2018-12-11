@@ -3,7 +3,7 @@ jobName="2018_Nov29-mu"
 j=0
 for i in {0..89}
 do
-    cat test-Analyzer-grow-l1t.py > SUB-Analyzer-${i}.py
+    cat test-Analyzer.py > SUB-Analyzer-${i}.py
     #echo "process.source.skipEvents = cms.untracked.uint32(${j})" >> SUB-Analyzer-${i}.py
     j=$(( $j + 100))
     cat submit-$i.py >> SUB-Analyzer-${i}.py
