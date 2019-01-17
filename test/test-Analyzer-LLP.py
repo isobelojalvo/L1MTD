@@ -36,14 +36,22 @@ process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(4000)
 )
 
+outFileName = "timing-StopToBL-M-300-CTau1000-noPU.root"
+inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1000-noPU-gen-sim-digi-raw-reco.root"
+#outFileName = "file:dyll-llp-official.root"
+#inFileName = "/store/mc/PhaseIIMTDTDRAutumn18DR/DYToLL_M-50_14TeV_pythia8/GEN-SIM-RECO/PU200_pilot_103X_upgrade2023_realistic_v2_ext2-v2/00000/FA39381B-9BBC-8C4A-90B8-A28CF803D044.root"
+#inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DYLL-200PU/DYll-gen-sim-raw-reco.root"
+#outFileName = "timing-SmuonToMuNu_M-200_CTau-1-noPU.root"
+#inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_SmuonToNeutralino_M-300/displacedSUSY_SmuonToMuNeutralino_M-200_CTau-1-noPU-gen-sim-digi-raw-reco.root"
+#outFileName = "timing-StopToBL-M-300-CTau100-noPU.root"
+#inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-100-noPU-gen-sim-digi-raw-reco.root"
+
+
 # Input source
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
-        "file:iDM_Mchi-5p25_dMchi-0p5_mZDinput-15p0_ctau-0_39826787_AOD_ctau-100.root"
-        #"/store/mc/PhaseIIMTDTDRAutumn18DR/DYToLL_M-50_14TeV_pythia8/GEN-SIM-RECO/PU200_pilot_103X_upgrade2023_realistic_v2_ext2-v2/00000/FA39381B-9BBC-8C4A-90B8-A28CF803D044.root"
-        #"file:DisplacedSUSY_StopToBL_M-300_CTau-1000-gen-sim-digi-raw-20.root"
-        #"file:/hdfs/store/user/ojalvo/Timing-Samples/DYLL-200PU/DYll-gen-sim-raw-reco.root"
-        #"file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1-gen-sim-raw.root",
+        inFileName
+        #"file:/afs/hep.wisc.edu/cms/ojalvo/triggerPhaseII/2018_devel/MTD_devel/2018/test-cmsdriver-10_4_X/PPD-PhaseIIMTDTDRAutumn18DR-00002.root"
         #"root://cmsxrootd.fnal.gov///store/relval/CMSSW_10_4_0_mtd3/RelValTTbar_Tauola_14TeV/GEN-SIM-RECO/PU25ns_103X_upgrade2023_realistic_v2_2023D35PU200_4-v2/20000/E75806D2-0A52-7240-912A-2BBBF690B16A.root"
         #"file:DisplacedSUSY_StopToBL_M-300_CTau-1000-gen-sim-digi-raw-reco-20.root"
         #"root://cmsxrootd.fnal.gov///store/relval/CMSSW_10_4_0_mtd2_patch1/RelValMinBias_14TeV/MINIAODSIM/103X_upgrade2023_realistic_v2_2023D35noPU-v1/20000/0F0F8B8D-DE01-FB49-9CC4-F1641C26E063.root"
@@ -121,8 +129,8 @@ process.FEVTDEBUGHLToutput_step = cms.EndPath(process.FEVTDEBUGHLToutput)
 
 from RecoLocalFastTime.FTLClusterizer.MTDCPEESProducer_cfi import *
 
-#process.load('RecoLocalFastTime.FTLClusterizer.mtdClusters_cfi')
-#process.mtdCluster_step = cms.Path(process.mtdClusters)
+process.load('RecoLocalFastTime.FTLClusterizer.mtdClusters_cfi')
+process.mtdCluster_step = cms.Path(process.mtdClusters)
 
 
 #track times
@@ -162,10 +170,14 @@ from RecoLocalFastTime.FTLClusterizer.MTDCPEESProducer_cfi import *
 ##the analyzer
 ##the analyzer
 
-process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDGenAnalyzer',
-#                                       HepMCProduct     = cms.InputTag("generatorSmeared","","SIM"),
-                                       genParticles     = cms.InputTag("genParticles","","HLT"),
-#                                       mtdClusterEndcap = cms.InputTag("mtdClusters", "FTLEndcap", "ANALYSIS"),
+process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDLLPAnalyzer',
+                                       FTLBarrel = cms.InputTag("mix","FTLBarrel","HLT"),
+                                       FTLEndcap = cms.InputTag("mix","FTLEndcap","HLT"),
+                                       recHitBarrel = cms.InputTag("mtdRecHits","FTLBarrel","RECO"),
+                                       recHitEndcap = cms.InputTag("mtdRecHits","FTLEndcap","RECO"),
+                                       mtdClusterBarrel = cms.InputTag("mtdClusters", "FTLBarrel", "ANALYSIS"),
+                                       mtdClusterEndcap = cms.InputTag("mtdClusters", "FTLEndcap", "ANALYSIS"),
+                                       l1Taus = cms.InputTag("l1extraParticles","Central","RECO"),
                                        time_cut  = cms.double(0.150)
                                        )
 
@@ -173,14 +185,13 @@ process.analyzer = cms.Path(process.L1MTDAnalyzer)
 
 
 process.TFileService = cms.Service("TFileService", 
-   fileName = cms.string("analyzer.root"), 
+   fileName = cms.string(outFileName), 
    closeFileFast = cms.untracked.bool(True)
 )
 
 # Schedule definition
 
-#process.schedule = cms.Schedule(process.EcalEBtp_step,process.analyzer)
-process.schedule = cms.Schedule(process.analyzer)
+process.schedule = cms.Schedule(process.EcalEBtp_step,process.mtdCluster_step,process.analyzer)
 #process.L1simulation_step,process.timingtracks,process.l1pf,process.L1PFTaus,process.mettime,process.analyzer,process.endjob_step) 
 
 from PhysicsTools.PatAlgos.tools.helpers import associatePatAlgosToolsTask

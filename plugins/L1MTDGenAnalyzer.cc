@@ -107,7 +107,8 @@ private:
 
   double genPt, genEta, genPhi;
 
-  TTree* recHitTree;
+  TTree* genTree;
+  TTree* genTreeReco;
   TTree* clusterTree;
   double time, isTimeValid, timeError, energy;
   double x;           
@@ -122,6 +123,11 @@ private:
   double hitEnergy;   
   double hitTime;     
   double hitTimeError;
+  double mass;
+  double px;
+  double py;    
+  double eta;  
+  double phi;
   
 };
 
@@ -132,7 +138,7 @@ L1MTDGenAnalyzer::L1MTDGenAnalyzer(const edm::ParameterSet &cfg) :
   //etlRecHitToken_(     consumes< FTLRecHitCollection > ( cfg.getParameter<InputTag>("recHitEndcap"))), // finish me
   //btlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterBarrel"))),
   //etlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterEndcap"))),
-  HepMCProductToken_(    consumes< edm::HepMCProduct >    ( cfg.getParameter<InputTag>("HepMCProduct"))),
+  //HepMCProductToken_(    consumes< edm::HepMCProduct >    ( cfg.getParameter<InputTag>("HepMCProduct"))),
   genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
   time_cut_(           cfg.getParameter<double>("time_cut"))
 {
@@ -142,11 +148,27 @@ L1MTDGenAnalyzer::L1MTDGenAnalyzer(const edm::ParameterSet &cfg) :
   genToken_ =     consumes<std::vector<reco::GenParticle> >(genSrc_);
   Service<TFileService> fs;
   
-  recHitTree = fs->make<TTree>("recHitTree","recHit Tree" );
-  recHitTree->Branch("time",        &time,         "time/D");
-  recHitTree->Branch("isTimeValid", &isTimeValid, "isTimeValid/D");
-  recHitTree->Branch("timeError",   &timeError,   "timeError/D");
-  recHitTree->Branch("energy",      &energy,       "energy/D");
+  genTree = fs->make<TTree>("genTree","recHit Tree" );
+  genTree->Branch("time",        &time,         "time/D");
+  //genTree->Branch("isTimeValid", &isTimeValid, "isTimeValid/D");
+  //genTree->Branch("timeError",   &timeError,   "timeError/D");
+  genTree->Branch("energy",      &energy,       "energy/D");
+  genTree->Branch("mass",        &mass,       "mass/D");
+  genTree->Branch("px",          &px,       "px/D");
+  genTree->Branch("py",          &py,       "py/D");
+  genTree->Branch("eta",         &eta,          "eta/D");
+  genTree->Branch("phi",         &phi,       "phi/D");
+
+  genTreeReco = fs->make<TTree>("genTreeReco","recHit Tree" );
+  genTreeReco->Branch("time",        &time,         "time/D");
+  //genTreeReco->Branch("isTimeValid", &isTimeValid, "isTimeValid/D");
+  //genTreeReco->Branch("timeError",   &timeError,   "timeError/D");
+  genTreeReco->Branch("energy",      &energy,       "energy/D");
+  genTreeReco->Branch("mass",        &mass,       "mass/D");
+  genTreeReco->Branch("px",          &px,       "px/D");
+  genTreeReco->Branch("py",          &py,       "py/D");
+  genTreeReco->Branch("eta",         &eta,          "eta/D");
+  genTreeReco->Branch("phi",         &phi,       "phi/D");
 
   clusterTree = fs->make<TTree>("clusterTree","cluster Tree" );
   clusterTree->Branch("x",             &x,              "x/D");           
@@ -171,130 +193,58 @@ L1MTDGenAnalyzer::~L1MTDGenAnalyzer()
 void 
 L1MTDGenAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-  //edm::Handle<BTLDigiCollection> btlDigis;
-  //iEvent.getByToken(btlDigisToken_,btlDigis);
-
-  //edm::Handle<ETLDigiCollection> etlDigis;
-  //iEvent.getByToken(etlDigisToken_,etlDigis);
-
-  //edm::Handle< FTLRecHitCollection > btlRecHits;
-  //iEvent.getByToken(btlRecHitToken_,btlRecHits);
-
-  //edm::Handle< FTLRecHitCollection > etlRecHits;
-  //iEvent.getByToken(etlRecHitToken_,etlRecHits);
-
-  //edm::Handle< FTLClusterCollection > btlClusters;
-  //iEvent.getByToken(btlClusterToken_,btlClusters);
-
-  //edm::Handle< FTLClusterCollection > etlClusters;
-  //iEvent.getByToken(etlClusterToken_,etlClusters);
-
-  //edm::Handle<std::vector<reco::GenParticle> > genParticleHandle;
-  //for(unsigned int i = 0; i< genParticleHandle->size(); i++){
-  //edm::Ptr<reco::GenParticle> ptr(genParticleHandle, i);
-  //}
-
+  /*
    edm::Handle<edm::HepMCProduct> HepMCHandle;
    iEvent.getByToken( HepMCProductToken_, HepMCHandle) ;
    const HepMC::GenEvent* Evt = HepMCHandle->GetEvent() ;
    //
    // this is an example loop over the hierarchy of vertices
    //
-   std::cout<<"Here 1"<<std::endl;
    int i = 0;
    for ( HepMC::GenEvent::vertex_const_iterator
 	   itVtx=Evt->vertices_begin(); itVtx!=Evt->vertices_end(); ++itVtx )
      {
-       std::cout<<"Here 2"<<std::endl;
        i++;
-       //
-       // this is an example loop over particles coming out of each vertex in the loop
-       //
        int j = 0; 
        for ( HepMC::GenVertex::particles_out_const_iterator
 	       itPartOut=(*itVtx)->particles_out_const_begin();
 	     itPartOut!=(*itVtx)->particles_out_const_end(); ++itPartOut )
 	 {
-	   std::cout<<"Here 3 "<<std::endl;
-	   double time = (*itPartOut)->momentum().t();
-	   if(j<20)
-	     std::cout<< "pdgID: "<<(*itPartOut)->pdg_id() <<" mass: "<< (*itPartOut)->momentum().m()<< " px: "<<(*itPartOut)->momentum.px() <<" time: "<<time<<std::endl;
-	   j++;
-	   std::cout<<"Here 4"<<std::endl;
+	   time = (*itPartOut)->momentum().t();
+	   //energy = (*itPartOut)->momentum().et();
+	   mass = (*itPartOut)->momentum().m();
+	   px = (*itPartOut)->momentum().px();
+	   py = (*itPartOut)->momentum().py();
+	   eta = (*itPartOut)->momentum().eta();
+	   phi = (*itPartOut)->momentum().phi();
+	   genTree->Fill();
+	   //if(j<20)
+	   //std::cout<< "pdgID: "<<(*itPartOut)->pdg_id() <<" mass: "<< (*itPartOut)->momentum().m()<< " px: "<<(*itPartOut)->momentum.px() <<" time: "<<time<<std::endl;
+
+	   //j++;
 	 }
      }
    std::cout<<"n HepMC Vertices: "<<i<<std::endl;
-
-  //if( btlRecHits->size() > 0 ){
-  //for(const auto& recHit : *btlRecHits){
-
-  //  time        = (double)recHit.time();
-  //  isTimeValid = (double)recHit.isTimeValid();
-  //  timeError   = (double)recHit.timeError();;
-  //  energy      = (double)recHit.energy();
-  //  recHitTree->Fill();
-  //}
-  // }
-
-  //if( btlClusters->size() > 0 ){
-  //for(const auto& detIds : *btlClusters){
-  //  for(const auto& cluster : detIds){
-  //	x            = (double)cluster.x();
-  //	y            = (double)cluster.y();
-  //	time         = (double)cluster.time();
-  //	timeError    = (double)cluster.timeError();
-  //	size         = (double)cluster.size();
-  //	sizeX        = (double)cluster.sizeX();
-  //	sizeY        = (double)cluster.sizeY();
-  //	energy       = (double)cluster.energy();
-  //	hitOffset    = (double)cluster.hitOffset().at(0);
-  //	hitEnergy    = (double)cluster.hitENERGY().at(0);
-  //	hitTime      = (double)cluster.hitTIME().at(0);
-  //	hitTimeError = (double)cluster.hitTIME_ERROR().at(0);
-  //	clusterTree->Fill();
-  //  }
-  //}
-  //}
-
-  /*
-  if (btlDigis->size() > 0 ) {
-
-    std::cout << " ----------------------------------------" << std::endl;
-    std::cout << " BTL DIGI collection:" << std::endl;
-  
-    for (const auto& dataFrame: *btlDigis) {
-
-      // --- detector element ID:
-      std::cout << "   det ID:  det = " << dataFrame.id().det() 
-		<< "  subdet = "  << dataFrame.id().mtdSubDetector() 
-		<< "  side = "    << dataFrame.id().mtdSide() 
-		<< "  rod = "     << dataFrame.id().mtdRR() 
-		<< "  mod = "     << dataFrame.id().module() 
-		<< "  type = "    << dataFrame.id().modType() 
-		<< "  crystal = " << dataFrame.id().crystal() 
-		<< std::endl;
-
-
-      // --- loop over the dataFrame samples
-      for (int isample = 0; isample<dataFrame.size(); ++isample){
-
-	const auto& sample = dataFrame.sample(isample);
-
-	std::cout << "       sample " << isample << ":"; 
-	if ( sample.data()==0 && sample.toa()==0 ) {
-	  std::cout << std::endl;
-	  continue;
-	}
-	std::cout << "  amplitude = " << sample.data() 
-		  << "  time1 = " <<  sample.toa() 
-		  << "  time2 = " <<  sample.toa2() << std::endl;
-
-      } // isaple loop
-
-    } // digi loop
-
-  } // if (btlDigis->size() > 0 )
   */
+
+   edm::Handle<GenParticleCollectionType> genParticleHandle;
+   if(!iEvent.getByToken(genToken_,genParticleHandle))
+     std::cout<<"No gen Particles Found "<<std::endl;
+   else
+     std::cout<<"Gen Particles size "<<genParticleHandle->size()<<std::endl;
+
+   for(unsigned int i = 0; i< genParticleHandle->size(); i++){
+     edm::Ptr<reco::GenParticle> ptr(genParticleHandle, i);
+     time = ptr->p4().T();
+     energy = ptr->et();
+     mass = ptr->mass();
+     px = ptr->px();
+     py = ptr->py();
+     eta = ptr->eta();
+     phi = ptr->phi();
+     genTreeReco->Fill();
+     
+   }
 
 }
 

@@ -55,6 +55,7 @@
 #include "DataFormats/PatCandidates/interface/PackedCandidate.h"
 #include "DataFormats/Candidate/interface/Candidate.h"
 #include "DataFormats/Math/interface/deltaR.h"
+#include "DataFormats/L1Trigger/interface/L1JetParticle.h"
 
 #include "DataFormats/L1CaloTrigger/interface/L1CaloCollections.h"
 
@@ -67,6 +68,11 @@
 
 using namespace edm;
 using namespace std;
+
+struct {
+  l1extra::L1JetParticle l1object;
+  FTLCluster cluster;
+} l1_time_match; 
 
 class L1MTDLLPAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
   public:
@@ -95,13 +101,13 @@ private:
   
   EDGetTokenT< FTLClusterCollection > btlClusterToken_;
   EDGetTokenT< FTLClusterCollection > etlClusterToken_;
-
+  EDGetTokenT< vector<l1extra::L1JetParticle> > l1TausToken_;
   double time_cut_;
 
   InputTag genSrc_;
 
   double genPt, genEta, genPhi;
-
+  double eta, phi;
   TTree* recHitTree;
   TTree* clusterTree;
   double time, isTimeValid, timeError, energy;
@@ -127,6 +133,8 @@ L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :
   etlRecHitToken_(     consumes< FTLRecHitCollection > ( cfg.getParameter<InputTag>("recHitEndcap"))), // finish me
   btlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterBarrel"))),
   etlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterEndcap"))),
+  l1TausToken_(        consumes< vector<l1extra::L1JetParticle> >( cfg.getParameter<InputTag>("l1Taus"))),
+  //vector<l1extra::L1JetParticle>        "l1extraParticles"          "Tau"             "RECO"
   //genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
   time_cut_(           cfg.getParameter<double>("time_cut"))
 {
@@ -143,6 +151,8 @@ L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :
   recHitTree->Branch("energy",      &energy,       "energy/D");
 
   clusterTree = fs->make<TTree>("clusterTree","cluster Tree" );
+  clusterTree->Branch("eta",           &eta,            "eta/D");           
+  clusterTree->Branch("phi",           &phi,            "phi/D");           
   clusterTree->Branch("x",             &x,              "x/D");           
   clusterTree->Branch("y",             &y,           	"y/D");           
   clusterTree->Branch("time",          &time,        	"time/D");        
@@ -182,6 +192,9 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
   edm::Handle< FTLClusterCollection > etlClusters;
   iEvent.getByToken(etlClusterToken_,etlClusters);
+  
+  edm::Handle< vector<l1extra::L1JetParticle> > l1Taus;
+  iEvent.getByToken(l1TausToken_, l1Taus);
 
 
   if( btlRecHits->size() > 0 ){
@@ -198,6 +211,8 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   if( btlClusters->size() > 0 ){
     for(const auto& detIds : *btlClusters){
       for(const auto& cluster : detIds){
+	//eta          = (double)cluster.eta();
+	//phi          = (double)cluster.phi();
 	x            = (double)cluster.x();
 	y            = (double)cluster.y();
 	time         = (double)cluster.time();
@@ -213,6 +228,12 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 	clusterTree->Fill();
       }
     }
+  }
+
+  std::cout<<"l1Taus size "<<l1Taus->size()<<std::endl;
+  for(const auto& l1object : *l1Taus){
+    std::cout<<"x: "<<l1object.p4().x()<<std::endl;
+    std::cout<<"y: "<<l1object.p4().y()<<std::endl;
   }
 
   /*
