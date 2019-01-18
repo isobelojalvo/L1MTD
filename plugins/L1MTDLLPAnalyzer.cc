@@ -139,7 +139,7 @@ private:
   const MTDGeometry* geom_; 
  
   EDGetTokenT<std::vector<reco::GenParticle> > genToken_;
-
+  
   EDGetTokenT< BTLDigiCollection >  btlDigisToken_;
   EDGetTokenT< ETLDigiCollection >  etlDigisToken_;
 
@@ -152,11 +152,13 @@ private:
   InputTag genSrc_;
   double time_cut_;
 
-  double genPt, genEta, genPhi;
+  double genPt, genEta, genPhi, genEnergy, genPdgId, genStatus;
+  bool genIsPromptFinalState;
   double eta, phi;
   TTree* recHitTree;
   TTree* clusterTree;
   TTree* digiTree;
+  TTree* genParticleTree;
   double time, isTimeValid, timeError, energy;
   double x;           
   double y;
@@ -188,7 +190,7 @@ L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :
   etlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterEndcap"))),
   l1TausToken_(        consumes< vector<l1extra::L1JetParticle> >( cfg.getParameter<InputTag>("l1Taus"))),
   //vector<l1extra::L1JetParticle>        "l1extraParticles"          "Tau"             "RECO"
-  //genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
+  genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
   time_cut_(           cfg.getParameter<double>("time_cut"))
 {
 
@@ -234,6 +236,17 @@ L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :
   digiTree->Branch("hitEnergy",     &hitEnergy,   	"hitEnergy/D");   
   digiTree->Branch("hitTime",       &hitTime,     	"hitTime/D");     
   digiTree->Branch("hitTimeError",  &hitTimeError,	"hitTimeError/D");
+
+  genParticleTree = fs->make<TTree>("genParticleTree","generated particle Tree" );
+  genParticleTree->Branch("gen_pt",            &genPt,            "gen_pt/D");           
+  genParticleTree->Branch("gen_eta",           &genEta,           "gen_eta/D");           
+  genParticleTree->Branch("gen_phi",           &genPhi,           "gen_phi/D");           
+  genParticleTree->Branch("gen_Energy",        &genEnergy,        "gen_Energy/D");           
+  genParticleTree->Branch("gen_pdgId",         &genPdgId,         "gen_pdgId/D");           
+  genParticleTree->Branch("gen_status",        &genStatus,         "gen_status/D");           
+  genParticleTree->Branch("gen_isPromptFinalState",      &genIsPromptFinalState,      "gen_isPromptFinalState/b");           
+
+
 }
 //destructor
 L1MTDLLPAnalyzer::~L1MTDLLPAnalyzer()
@@ -272,7 +285,28 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
   edm::Handle< vector<l1extra::L1JetParticle> > l1Taus;
   iEvent.getByToken(l1TausToken_, l1Taus);
 
+  edm::Handle< std::vector< reco::GenParticle> > genParticles;
+  iEvent.getByToken(genToken_, genParticles);
 
+
+  // *** Generator Particles
+  if( genParticles->size() > 0 ){
+    for(const auto& genParticle : *genParticles){
+      genPt        = (double)genParticle.p4().pt();
+      genEta       = (double)genParticle.p4().eta();
+      genPhi       = (double)genParticle.p4().phi();
+      genEnergy    = (double)genParticle.p4().e();
+      genPdgId     = (double)genParticle.pdgId();
+      genStatus    = (double)genParticle.status();
+      genIsPromptFinalState  = (bool)genParticle.isPromptFinalState();
+
+      genParticleTree->Fill();
+
+    }
+  }
+
+
+  // *** BTL RecHits
   if( btlRecHits->size() > 0 ){
     for(const auto& recHit : *btlRecHits){
 

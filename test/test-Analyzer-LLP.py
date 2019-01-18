@@ -6,6 +6,7 @@
 import FWCore.ParameterSet.Config as cms
 
 from Configuration.StandardSequences.Eras import eras
+from Configuration.Eras.Modifier_phase2_hgcalV9_cff import phase2_hgcalV9 # BBT, 01-18-19
 
 #process = cms.Process('ANALYSIS')
 process = cms.Process('ANALYSIS',eras.Phase2_timing_layer_bar)
@@ -33,11 +34,19 @@ process.load("Geometry.MTDGeometryBuilder.mtdParameters_cfi")
 process.mtdGeometry.applyAlignment = cms.bool(False)
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(4000)
+    #input = cms.untracked.int32(4000)
+    input = cms.untracked.int32(40)
 )
 
-outFileName = "timing-StopToBL-M-300-CTau1000-noPU.root"
-inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1000-noPU-gen-sim-digi-raw-reco.root"
+# Isobel
+#outFileName = "timing-StopToBL-M-300-CTau1000-noPU.root"
+#inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1000-noPU-gen-sim-digi-raw-reco.root"
+
+# Ben
+outFileName = "timing-DisplacedSUSY_StopToBL_M-300_CTau-1-200PU.root"
+inFileName = "root://cmseos.fnal.gov//store/user/benjtann/MTD_LLP/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1-gen-sim-digi-raw-reco.root"
+
+
 #outFileName = "file:dyll-llp-official.root"
 #inFileName = "/store/mc/PhaseIIMTDTDRAutumn18DR/DYToLL_M-50_14TeV_pythia8/GEN-SIM-RECO/PU200_pilot_103X_upgrade2023_realistic_v2_ext2-v2/00000/FA39381B-9BBC-8C4A-90B8-A28CF803D044.root"
 #inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DYLL-200PU/DYll-gen-sim-raw-reco.root"
@@ -99,14 +108,15 @@ process.FEVTDEBUGHLToutput = cms.OutputModule("PoolOutputModule",
 
 # Other statements
 from Configuration.AlCa.GlobalTag import GlobalTag
-process.GlobalTag = GlobalTag(process.GlobalTag, '100X_upgrade2023_realistic_v1', '')
+#process.GlobalTag = GlobalTag(process.GlobalTag, '100X_upgrade2023_realistic_v1', '')
+process.GlobalTag = GlobalTag(process.GlobalTag, '102X_upgrade2023_realistic_v5', '') # BBT, 01-18-19
 
 
 process.load('SimCalorimetry.HcalTrigPrimProducers.hcaltpdigi_cff')
 process.load('CalibCalorimetry.CaloTPG.CaloTPGTranscoder_cfi')
 
-#process.load('L1Trigger.L1THGCal.hgcalTriggerPrimitives_cff')
-#process.hgcl1tpg_step = cms.Path(process.hgcalTriggerPrimitives)
+process.load('L1Trigger.L1THGCal.hgcalTriggerPrimitives_cff') # BBT, 01-18-19, uncomment
+process.hgcl1tpg_step = cms.Path(process.hgcalTriggerPrimitives) # BBT, 01-18-19, uncomment
 
 process.load('SimCalorimetry.EcalEBTrigPrimProducers.ecalEBTriggerPrimitiveDigis_cff')
 process.EcalEBtp_step = cms.Path(process.simEcalEBTriggerPrimitiveDigis)
@@ -114,6 +124,10 @@ process.EcalEBtp_step = cms.Path(process.simEcalEBTriggerPrimitiveDigis)
 #process.L1TrackTrigger_step = cms.Path(process.L1TrackletTracksWithAssociators)
 
 #process.VertexProducer.l1TracksInputTag = cms.InputTag("TTTracksFromTracklet", "Level1TTTracks")
+
+process.simCaloStage2Layer1Digis.ecalToken = cms.InputTag("simEcalTriggerPrimitiveDigis") # BBT, 01-18-19
+process.simCaloStage2Layer1Digis.hcalToken = cms.InputTag("simHcalTriggerPrimitiveDigis") # BBT, 01-18-19
+process.load('L1Trigger.L1TCalorimeter.simCaloStage2Digis_cfi') # BBT, 01-18-19
 
 # Path and EndPath definitions
 process.L1simulation_step = cms.Path(process.SimL1Emulator)
@@ -178,7 +192,8 @@ process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDLLPAnalyzer',
                                        mtdClusterBarrel = cms.InputTag("mtdClusters", "FTLBarrel", "ANALYSIS"),
                                        mtdClusterEndcap = cms.InputTag("mtdClusters", "FTLEndcap", "ANALYSIS"),
                                        l1Taus = cms.InputTag("l1extraParticles","Central","RECO"),
-                                       time_cut  = cms.double(0.150)
+                                       time_cut  = cms.double(0.150),
+                                       genParticles = cms.InputTag("genParticles","","HLT"),
                                        )
 
 process.analyzer = cms.Path(process.L1MTDAnalyzer)
@@ -192,6 +207,10 @@ process.TFileService = cms.Service("TFileService",
 # Schedule definition
 
 process.schedule = cms.Schedule(process.EcalEBtp_step,process.mtdCluster_step,process.analyzer)
+#process.schedule = cms.Schedule(process.EcalEBtp_step,process.hgcl1tpg_step,process.mtdCluster_step,process.analyzer) # BBT, 01-18-19
+#process.schedule = cms.Schedule(process.EcalEBtp_step,process.mtdCluster_step,process.analyzer) # BBT, 01-18-19
+#process.schedule = cms.Schedule(process.L1simulation_step,process.EcalEBtp_step,process.mtdCluster_step,process.analyzer) # BBT, 01-18-19
+#process.schedule = cms.Schedule(process.EcalEBtp_step,process.mtdCluster_step,process.analyzer,process.L1simulation_step) # BBT, 01-18-19
 #process.L1simulation_step,process.timingtracks,process.l1pf,process.L1PFTaus,process.mettime,process.analyzer,process.endjob_step) 
 
 from PhysicsTools.PatAlgos.tools.helpers import associatePatAlgosToolsTask
