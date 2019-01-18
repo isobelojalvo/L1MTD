@@ -37,6 +37,26 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 
+#include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
+#include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
+
+#include "DataFormats/ForwardDetId/interface/MTDDetId.h"
+#include "DataFormats/ForwardDetId/interface/BTLDetId.h"
+#include "DataFormats/FTLDigi/interface/FTLDigiCollections.h"
+#include "DataFormats/FTLRecHit/interface/FTLRecHitCollections.h"
+
+#include "Geometry/Records/interface/MTDDigiGeometryRecord.h"
+#include "Geometry/MTDGeometryBuilder/interface/MTDGeometry.h"
+#include "Geometry/MTDGeometryBuilder/interface/ProxyMTDTopology.h"
+#include "Geometry/MTDGeometryBuilder/interface/RectangularMTDTopology.h"
+#include "Geometry/CommonTopologies/interface/PixelTopology.h"
+
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "CommonTools/UtilAlgos/interface/TFileService.h"
+
+#include "CLHEP/Units/GlobalPhysicalConstants.h"
+
 //Vertex and gen particle
 #include "DataFormats/EcalDigi/interface/EcalDigiCollections.h"
 #include "Geometry/CaloEventSetup/interface/CaloTopologyRecord.h"
@@ -69,6 +89,29 @@
 using namespace edm;
 using namespace std;
 
+
+struct MTDinfo {
+
+  float sim_energy;
+  float sim_time;
+  float sim_x;
+  float sim_y;
+  float sim_z;
+
+  uint32_t digi_row[2];
+  uint32_t digi_col[2];
+  uint32_t digi_charge[2];
+  uint32_t digi_time1[2];
+  uint32_t digi_time2[2];
+
+  float ureco_charge[2];
+  float ureco_time[2];
+
+  float reco_energy;
+  float reco_time;
+
+};
+
 struct {
   l1extra::L1JetParticle l1object;
   FTLCluster cluster;
@@ -89,8 +132,12 @@ private:
   virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
   virtual void endJob() override;
 
+  const float btlMinEnergy_;
+
   typedef std::vector<reco::GenParticle> GenParticleCollectionType;
-  
+
+  const MTDGeometry* geom_; 
+ 
   EDGetTokenT<std::vector<reco::GenParticle> > genToken_;
 
   EDGetTokenT< BTLDigiCollection >  btlDigisToken_;
@@ -102,17 +149,18 @@ private:
   EDGetTokenT< FTLClusterCollection > btlClusterToken_;
   EDGetTokenT< FTLClusterCollection > etlClusterToken_;
   EDGetTokenT< vector<l1extra::L1JetParticle> > l1TausToken_;
-  double time_cut_;
-
   InputTag genSrc_;
+  double time_cut_;
 
   double genPt, genEta, genPhi;
   double eta, phi;
   TTree* recHitTree;
   TTree* clusterTree;
+  TTree* digiTree;
   double time, isTimeValid, timeError, energy;
   double x;           
-  double y;           
+  double y;
+  double z;
   //double time;        
   //double timeError;   
   double size;        
@@ -123,10 +171,15 @@ private:
   double hitEnergy;   
   double hitTime;     
   double hitTimeError;
+
+  std::unordered_map<uint32_t, MTDinfo> btl_hits;
+  std::unordered_map<uint32_t, MTDinfo> etl_hits[2];
   
 };
 
 L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :  
+  btlMinEnergy_( cfg.getParameter<double>("BTLMinimumEnergy") ),
+  geom_(nullptr),
   btlDigisToken_(      consumes< BTLDigiCollection >   ( cfg.getParameter<InputTag>("FTLBarrel"))),
   etlDigisToken_(      consumes< ETLDigiCollection >   ( cfg.getParameter<InputTag>("FTLEndcap"))),
   btlRecHitToken_(     consumes< FTLRecHitCollection > ( cfg.getParameter<InputTag>("recHitBarrel"))), // finish me
@@ -165,6 +218,22 @@ L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :
   clusterTree->Branch("hitEnergy",     &hitEnergy,   	"hitEnergy/D");   
   clusterTree->Branch("hitTime",       &hitTime,     	"hitTime/D");     
   clusterTree->Branch("hitTimeError",  &hitTimeError,	"hitTimeError/D");
+
+  digiTree = fs->make<TTree>("digiTree","digi Tree" );
+  digiTree->Branch("eta",           &eta,            "eta/D");           
+  digiTree->Branch("phi",           &phi,            "phi/D");           
+  digiTree->Branch("x",             &x,              "x/D");           
+  digiTree->Branch("y",             &y,           	"y/D");           
+  digiTree->Branch("time",          &time,        	"time/D");        
+  digiTree->Branch("timeError",     &timeError,   	"timeError/D");   
+  digiTree->Branch("size",          &size,        	"size/D");        
+  digiTree->Branch("sizeX",         &sizeX,       	"sizeX/D");       
+  digiTree->Branch("sizeY",         &sizeY,       	"sizeY/D");       
+  digiTree->Branch("energy",        &energy,      	"energy/D");      
+  digiTree->Branch("hitOffset",     &hitOffset,   	"hitOffset/D");   
+  digiTree->Branch("hitEnergy",     &hitEnergy,   	"hitEnergy/D");   
+  digiTree->Branch("hitTime",       &hitTime,     	"hitTime/D");     
+  digiTree->Branch("hitTimeError",  &hitTimeError,	"hitTimeError/D");
 }
 //destructor
 L1MTDLLPAnalyzer::~L1MTDLLPAnalyzer()
@@ -175,8 +244,15 @@ L1MTDLLPAnalyzer::~L1MTDLLPAnalyzer()
 void 
 L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-  edm::Handle<BTLDigiCollection> btlDigis;
-  iEvent.getByToken(btlDigisToken_,btlDigis);
+
+  edm::ESHandle<MTDGeometry> geom;
+  if( geom_ == nullptr ) {
+    iSetup.get<MTDDigiGeometryRecord>().get(geom);
+    geom_ = geom.product();
+  }
+
+  edm::Handle<BTLDigiCollection> h_BTL_digi;
+  iEvent.getByToken(btlDigisToken_,h_BTL_digi);
 
   edm::Handle<ETLDigiCollection> etlDigis;
   iEvent.getByToken(etlDigisToken_,etlDigis);
@@ -236,14 +312,15 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     std::cout<<"y: "<<l1object.p4().y()<<std::endl;
   }
 
-  /*
-  if (btlDigis->size() > 0 ) {
-
+  unsigned int n_digi_btl[2] = {0,0};
+  
+  if (h_BTL_digi->size() > 0 ) {
+    
     std::cout << " ----------------------------------------" << std::endl;
     std::cout << " BTL DIGI collection:" << std::endl;
-  
-    for (const auto& dataFrame: *btlDigis) {
-
+    
+    for (const auto& dataFrame: *h_BTL_digi) {
+      /*
       // --- detector element ID:
       std::cout << "   det ID:  det = " << dataFrame.id().det() 
 		<< "  subdet = "  << dataFrame.id().mtdSubDetector() 
@@ -268,13 +345,84 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 	std::cout << "  amplitude = " << sample.data() 
 		  << "  time1 = " <<  sample.toa() 
 		  << "  time2 = " <<  sample.toa2() << std::endl;
+      */
 
-      } // isaple loop
 
+      DetId id =  dataFrame.id();
+      
+      const auto& sample_L = dataFrame.sample(0);
+      const auto& sample_R = dataFrame.sample(1);
+
+      btl_hits[id.rawId()].digi_row[0] = sample_L.row();
+      btl_hits[id.rawId()].digi_row[1] = sample_R.row();
+      btl_hits[id.rawId()].digi_col[0] = sample_L.column();
+      btl_hits[id.rawId()].digi_col[1] = sample_R.column();
+
+      btl_hits[id.rawId()].digi_charge[0] = sample_L.data();
+      btl_hits[id.rawId()].digi_charge[1] = sample_R.data();
+      btl_hits[id.rawId()].digi_time1[0]  = sample_L.toa();
+      btl_hits[id.rawId()].digi_time1[1]  = sample_R.toa();
+      btl_hits[id.rawId()].digi_time2[0]  = sample_L.toa2();
+      btl_hits[id.rawId()].digi_time2[1]  = sample_R.toa2();
+
+      if ( sample_L.data() > 0 )
+	n_digi_btl[0]++;
+
+      if ( sample_R.data() > 0 )
+	n_digi_btl[1]++;
+      
+      
     } // digi loop
 
-  } // if (btlDigis->size() > 0 )
-  */
+  } // if (h_BTL_digi->size() > 0 )
+
+  unsigned int n_reco_btl = 0;
+
+  if (btlRecHits->size() > 0 ) {
+
+    for (const auto& recHit: *btlRecHits) {
+
+      DetId id = recHit.id();
+
+      btl_hits[id.rawId()].reco_energy = recHit.energy();
+      btl_hits[id.rawId()].reco_time   = recHit.time();
+
+      if ( recHit.energy() > 0. )
+	n_reco_btl++;
+
+
+    } // recHit loop
+
+  } // if ( h_BTL_reco->size() > 0 )
+
+  std::cout<<"number of btl_hits "<<btl_hits.size()<<std::endl;
+    for (auto const& hit: btl_hits) {
+      
+      BTLDetId detId(hit.first); 
+      
+      DetId geoId = BTLDetId(detId.mtdSide(),detId.mtdRR(),detId.module()+14*(detId.modType()-1),0,1);
+      const MTDGeomDet* thedet = geom_->idToDet(geoId);
+      const ProxyMTDTopology& topoproxy = static_cast<const ProxyMTDTopology&>(thedet->topology());
+      const RectangularMTDTopology& topo = static_cast<const RectangularMTDTopology&>(topoproxy.specificTopology());
+      
+      if ( (hit.second).reco_energy < btlMinEnergy_ ) continue;
+
+      Local3DPoint simscaled(0.1*(hit.second).sim_x,0.1*(hit.second).sim_y,0.1*(hit.second).sim_z);
+      simscaled = topo.pixelToModuleLocalPoint(simscaled,detId.row(topo.nrows()),detId.column(topo.nrows()));
+      const auto& global_pos = thedet->toGlobal(simscaled);
+      
+      eta          = (double)global_pos.eta();
+      phi          = (double)global_pos.phi();
+      x            = (double)global_pos.x();
+      y            = (double)global_pos.y();
+      z            = (double)global_pos.z();
+      time         = (double)(hit.second).reco_time;
+      //timeError    = (double);
+      energy       = (double)(hit.second).reco_energy;
+      
+      digiTree->Fill();
+    }
+  
 
 }
 

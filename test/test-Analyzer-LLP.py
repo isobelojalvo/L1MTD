@@ -168,9 +168,9 @@ process.mtdCluster_step = cms.Path(process.mtdClusters)
 #process.L1PFTaus = cms.Path(process.L1PFTauProducer)
 
 ##the analyzer
-##the analyzer
 
 process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDLLPAnalyzer',
+                                       BTLMinimumEnergy = cms.double(2),
                                        FTLBarrel = cms.InputTag("mix","FTLBarrel","HLT"),
                                        FTLEndcap = cms.InputTag("mix","FTLEndcap","HLT"),
                                        recHitBarrel = cms.InputTag("mtdRecHits","FTLBarrel","RECO"),
