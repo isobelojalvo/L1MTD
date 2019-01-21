@@ -39,10 +39,11 @@ process.maxEvents = cms.untracked.PSet(
 # Input source
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
-        "file:iDM_Mchi-5p25_dMchi-0p5_mZDinput-15p0_ctau-0_39826787_AOD_ctau-100.root"
+        #"file:iDM_Mchi-5p25_dMchi-0p5_mZDinput-15p0_ctau-0_39826787_AOD_ctau-100.root"
         #"/store/mc/PhaseIIMTDTDRAutumn18DR/DYToLL_M-50_14TeV_pythia8/GEN-SIM-RECO/PU200_pilot_103X_upgrade2023_realistic_v2_ext2-v2/00000/FA39381B-9BBC-8C4A-90B8-A28CF803D044.root"
         #"file:DisplacedSUSY_StopToBL_M-300_CTau-1000-gen-sim-digi-raw-20.root"
         #"file:/hdfs/store/user/ojalvo/Timing-Samples/DYLL-200PU/DYll-gen-sim-raw-reco.root"
+        "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_SmuonToNeutralino_M-300/displacedSUSY_SmuonToMuNeutralino_M-200_CTau-1000-noPU-gen-sim-digi-raw-reco.root"
         #"file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1-gen-sim-raw.root",
         #"root://cmsxrootd.fnal.gov///store/relval/CMSSW_10_4_0_mtd3/RelValTTbar_Tauola_14TeV/GEN-SIM-RECO/PU25ns_103X_upgrade2023_realistic_v2_2023D35PU200_4-v2/20000/E75806D2-0A52-7240-912A-2BBBF690B16A.root"
         #"file:DisplacedSUSY_StopToBL_M-300_CTau-1000-gen-sim-digi-raw-reco-20.root"
@@ -163,7 +164,7 @@ from RecoLocalFastTime.FTLClusterizer.MTDCPEESProducer_cfi import *
 ##the analyzer
 
 process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDGenAnalyzer',
-#                                       HepMCProduct     = cms.InputTag("generatorSmeared","","SIM"),
+                                       HepMCProduct     = cms.InputTag("generatorSmeared","","SIM"),
                                        genParticles     = cms.InputTag("genParticles","","HLT"),
 #                                       mtdClusterEndcap = cms.InputTag("mtdClusters", "FTLEndcap", "ANALYSIS"),
                                        time_cut  = cms.double(0.150)

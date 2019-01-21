@@ -101,6 +101,27 @@ private:
   //EDGetTokenT< FTLClusterCollection > btlClusterToken_;
   //EDGetTokenT< FTLClusterCollection > etlClusterToken_;
 
+  const HepMC::GenParticle* GetFinal(const HepMC::GenParticle* p){ // includes mixing (assuming mixing is not occurring more than 5 times back and forth)
+    const HepMC::GenParticle* aPart = p;
+    for (unsigned int iMix = 0; iMix < 10; iMix++) {
+      bool foundSimilar = false;
+      if(aPart->end_vertex()){ 
+	if(aPart->end_vertex()->particles_out_size()!=0){ 
+	  for(HepMC::GenVertex::particles_out_const_iterator d=aPart->end_vertex()->particles_out_const_begin(); d!=aPart->end_vertex()->particles_out_const_end();d++){ 
+	    if(abs((*d)->pdg_id())==abs(aPart->pdg_id())){ 
+	      aPart = *d;         
+	      foundSimilar = true;
+	      break;
+	    } 
+	  } 
+	}
+	if (!foundSimilar) break;
+      } 
+    } 
+    return aPart;
+  }
+
+
   double time_cut_;
 
   InputTag genSrc_;
@@ -138,7 +159,7 @@ L1MTDGenAnalyzer::L1MTDGenAnalyzer(const edm::ParameterSet &cfg) :
   //etlRecHitToken_(     consumes< FTLRecHitCollection > ( cfg.getParameter<InputTag>("recHitEndcap"))), // finish me
   //btlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterBarrel"))),
   //etlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterEndcap"))),
-  //HepMCProductToken_(    consumes< edm::HepMCProduct >    ( cfg.getParameter<InputTag>("HepMCProduct"))),
+  HepMCProductToken_(    consumes< edm::HepMCProduct >    ( cfg.getParameter<InputTag>("HepMCProduct"))),
   genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
   time_cut_(           cfg.getParameter<double>("time_cut"))
 {
@@ -193,7 +214,7 @@ L1MTDGenAnalyzer::~L1MTDGenAnalyzer()
 void 
 L1MTDGenAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-  /*
+  
    edm::Handle<edm::HepMCProduct> HepMCHandle;
    iEvent.getByToken( HepMCProductToken_, HepMCHandle) ;
    const HepMC::GenEvent* Evt = HepMCHandle->GetEvent() ;
@@ -218,14 +239,34 @@ L1MTDGenAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 	   eta = (*itPartOut)->momentum().eta();
 	   phi = (*itPartOut)->momentum().phi();
 	   genTree->Fill();
+	   if((*itPartOut)->pdg_id()==1000013){
 	   //if(j<20)
 	   //std::cout<< "pdgID: "<<(*itPartOut)->pdg_id() <<" mass: "<< (*itPartOut)->momentum().m()<< " px: "<<(*itPartOut)->momentum.px() <<" time: "<<time<<std::endl;
+	   //double time = (*itPartOut)->production_vertex()->point3d().x();
+	     const HepMC::GenParticle* pf = GetFinal(*itPartOut); // inlcude mixing
+	   if((*itPartOut)->production_vertex() && (*itPartOut)->end_vertex()){
+	     TVector3 PV((*itPartOut)->production_vertex()->point3d().x(),(*itPartOut)->production_vertex()->point3d().y(),(*itPartOut)->production_vertex()->point3d().z()); 
+	     TVector3 SV((*itPartOut)->end_vertex()->point3d().x(),(*itPartOut)->end_vertex()->point3d().y(),(*itPartOut)->end_vertex()->point3d().z()); 
+	     TVector3 DL=SV-PV; 
+	     double c(2.99792458E8),Ltau(DL.Mag()/100)/*cm->m*/,beta((*itPartOut)->momentum().rho()/(*itPartOut)->momentum().m()); 
+	     double lt=Ltau/(c*beta);
+	     //if(lt>1E-16)lifetime_init->Fill(log10(lt),weight);
+	     if(pf->end_vertex()){
+	       TVector3 SVf(pf->end_vertex()->point3d().x(),pf->end_vertex()->point3d().y(),pf->end_vertex()->point3d().z());
+	       DL=SVf-PV;
+	       Ltau=DL.Mag()/100;
+	       lt=Ltau/(c*beta);
 
+	       std::cout<<"LTau "<<Ltau<<" lifetime "<<lt<<std::endl;
+	       //if(lt>1E-16)lifetime_final->Fill(log10(lt),weight);
+	     }
+	   }
 	   //j++;
 	 }
      }
+     }
    std::cout<<"n HepMC Vertices: "<<i<<std::endl;
-  */
+  
 
    edm::Handle<GenParticleCollectionType> genParticleHandle;
    if(!iEvent.getByToken(genToken_,genParticleHandle))

@@ -36,13 +36,13 @@ process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(4000)
 )
 
-outFileName = "timing-StopToBL-M-300-CTau1000-noPU.root"
-inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1000-noPU-gen-sim-digi-raw-reco.root"
+#outFileName = "timing-StopToBL-M-300-CTau1-noPU.root"
+#inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1-noPU-gen-sim-digi-raw-reco.root"
 #outFileName = "file:dyll-llp-official.root"
 #inFileName = "/store/mc/PhaseIIMTDTDRAutumn18DR/DYToLL_M-50_14TeV_pythia8/GEN-SIM-RECO/PU200_pilot_103X_upgrade2023_realistic_v2_ext2-v2/00000/FA39381B-9BBC-8C4A-90B8-A28CF803D044.root"
 #inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DYLL-200PU/DYll-gen-sim-raw-reco.root"
-#outFileName = "timing-SmuonToMuNu_M-200_CTau-1-noPU.root"
-#inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_SmuonToNeutralino_M-300/displacedSUSY_SmuonToMuNeutralino_M-200_CTau-1-noPU-gen-sim-digi-raw-reco.root"
+outFileName = "timing-SmuonToMuNu_M-200_CTau-1000-noPU.root"
+inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_SmuonToNeutralino_M-300/displacedSUSY_SmuonToMuNeutralino_M-200_CTau-1000-noPU-gen-sim-digi-raw-reco.root"
 #outFileName = "timing-StopToBL-M-300-CTau100-noPU.root"
 #inFileName = "file:/hdfs/store/user/ojalvo/Timing-Samples/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-100-noPU-gen-sim-digi-raw-reco.root"
 
@@ -178,6 +178,8 @@ process.L1MTDAnalyzer = cms.EDAnalyzer('L1MTDLLPAnalyzer',
                                        mtdClusterBarrel = cms.InputTag("mtdClusters", "FTLBarrel", "ANALYSIS"),
                                        mtdClusterEndcap = cms.InputTag("mtdClusters", "FTLEndcap", "ANALYSIS"),
                                        l1Taus = cms.InputTag("l1extraParticles","Central","RECO"),
+                                       HepMCProduct     = cms.InputTag("generatorSmeared","","SIM"),
+                                       genParticles     = cms.InputTag("genParticles","","HLT"),
                                        time_cut  = cms.double(0.150)
                                        )
 

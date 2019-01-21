@@ -34,6 +34,10 @@
 #include "FWCore/Framework/interface/MakerMacros.h"
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "SimDataFormats/GeneratorProducts/interface/HepMCProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/GenRunInfoProduct.h"
+
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 
@@ -151,12 +155,76 @@ private:
   EDGetTokenT< vector<l1extra::L1JetParticle> > l1TausToken_;
   InputTag genSrc_;
   double time_cut_;
+  EDGetTokenT<edm::HepMCProduct> HepMCProductToken_;
 
-  double genPt, genEta, genPhi;
+  const HepMC::GenParticle* GetFinal(const HepMC::GenParticle* p){ // includes mixing (assuming mixing is not occurring more than 5 times back and forth)
+    const HepMC::GenParticle* aPart = p;
+    for (unsigned int iMix = 0; iMix < 10; iMix++) {
+      bool foundSimilar = false;
+      if(aPart->end_vertex()){ 
+	if(aPart->end_vertex()->particles_out_size()!=0){ 
+	  for(HepMC::GenVertex::particles_out_const_iterator d=aPart->end_vertex()->particles_out_const_begin(); d!=aPart->end_vertex()->particles_out_const_end();d++){ 
+	    if(abs((*d)->pdg_id())==abs(aPart->pdg_id())){ 
+	      aPart = *d;         
+	      foundSimilar = true;
+	      break;
+	    } 
+	  } 
+	}
+	if (!foundSimilar) break;
+      } 
+    } 
+    return aPart;
+  }
+
+
+
+
+  double genPt, genEta, genPhi, genEnergy, genPdgId, genStatus;
+  double matchedClusterTime;
+  double sumMatchedClusterTime;
+  double etaRingAvgTime;
+  double eventAvgTime;
+  double sumTimeRing0p4;
+  double sumTimeRing0p7;
+  double sumTimeRing0p8;
+  double sumTimeRing0p9;
+  double sumTimeRing1p0;
+  double sumTimeRing1p1;
+  double sumTimeRing1p2;
+  double sumTimeRing1p3;
+  double sumTimeRing1p4;
+  double sumTimeRing1p5;
+
+  double avgTimeRing0p4;
+  double avgTimeRing0p7;
+  double avgTimeRing0p8;
+  double avgTimeRing0p9;
+  double avgTimeRing1p0;
+  double avgTimeRing1p1;
+  double avgTimeRing1p2;
+  double avgTimeRing1p3;
+  double avgTimeRing1p4;
+  double avgTimeRing1p5;
+
+  double nHitsCluster;
+  double nHitsRing0p4;
+  double nHitsRing0p7;
+  double nHitsRing0p8;
+  double nHitsRing0p9;
+  double nHitsRing1p0;
+  double nHitsRing1p1;
+  double nHitsRing1p2;
+  double nHitsRing1p3;
+  double nHitsRing1p4;
+  double nHitsRing1p5;
+
+  bool genIsPromptFinalState;
   double eta, phi;
   TTree* recHitTree;
   TTree* clusterTree;
   TTree* digiTree;
+  TTree* genParticleTree;
   double time, isTimeValid, timeError, energy;
   double x;           
   double y;
@@ -186,12 +254,13 @@ L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :
   etlRecHitToken_(     consumes< FTLRecHitCollection > ( cfg.getParameter<InputTag>("recHitEndcap"))), // finish me
   btlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterBarrel"))),
   etlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterEndcap"))),
+  HepMCProductToken_(    consumes< edm::HepMCProduct >    ( cfg.getParameter<InputTag>("HepMCProduct"))),
   l1TausToken_(        consumes< vector<l1extra::L1JetParticle> >( cfg.getParameter<InputTag>("l1Taus"))),
+  genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
   //vector<l1extra::L1JetParticle>        "l1extraParticles"          "Tau"             "RECO"
   //genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
   time_cut_(           cfg.getParameter<double>("time_cut"))
 {
-
     //services
   usesResource("TFileService");
   genToken_ =     consumes<std::vector<reco::GenParticle> >(genSrc_);
@@ -234,6 +303,53 @@ L1MTDLLPAnalyzer::L1MTDLLPAnalyzer(const edm::ParameterSet &cfg) :
   digiTree->Branch("hitEnergy",     &hitEnergy,   	"hitEnergy/D");   
   digiTree->Branch("hitTime",       &hitTime,     	"hitTime/D");     
   digiTree->Branch("hitTimeError",  &hitTimeError,	"hitTimeError/D");
+
+  genParticleTree = fs->make<TTree>("genParticleTree","generated particle Tree" );
+  genParticleTree->Branch("gen_pt",                 &genPt,            "gen_pt/D");           
+  genParticleTree->Branch("gen_eta",                &genEta,           "gen_eta/D");           
+  genParticleTree->Branch("gen_phi",                &genPhi,           "gen_phi/D");           
+  genParticleTree->Branch("gen_Energy",             &genEnergy,        "gen_Energy/D");           
+  genParticleTree->Branch("gen_pdgId",              &genPdgId,         "gen_pdgId/D");           
+  //genParticleTree->Branch("gen_status",             &genStatus,         "gen_status/D");           
+  //genParticleTree->Branch("gen_isPromptFinalState", &genIsPromptFinalState,      "gen_isPromptFinalState/b");           
+  genParticleTree->Branch("matchedClusterTime",     &matchedClusterTime, "matchedClusterTime/D");
+  genParticleTree->Branch("sumMatchedClusterTime",     &sumMatchedClusterTime, "sumMatchedClusterTime/D");
+  genParticleTree->Branch("eventAvgTime",     &eventAvgTime,     "eventAvgTime/D" );
+
+  genParticleTree->Branch("sumTimeRing0p4", &sumTimeRing0p4 ,"sumTimeRing0p4/D" );
+  genParticleTree->Branch("sumTimeRing0p7", &sumTimeRing0p7 ,"sumTimeRing0p7/D" );
+  genParticleTree->Branch("sumTimeRing0p8", &sumTimeRing0p8 ,"sumTimeRing0p8/D" );
+  genParticleTree->Branch("sumTimeRing0p9", &sumTimeRing0p9 ,"sumTimeRing0p9/D" );
+  genParticleTree->Branch("sumTimeRing1p0", &sumTimeRing1p0 ,"sumTimeRing1p0/D" );
+  genParticleTree->Branch("sumTimeRing1p1", &sumTimeRing1p1 ,"sumTimeRing1p1/D" );
+  genParticleTree->Branch("sumTimeRing1p2", &sumTimeRing1p2 ,"sumTimeRing1p2/D" );
+  genParticleTree->Branch("sumTimeRing1p3", &sumTimeRing1p3 ,"sumTimeRing1p3/D" );
+  genParticleTree->Branch("sumTimeRing1p4", &sumTimeRing1p4 ,"sumTimeRing1p4/D" );
+  genParticleTree->Branch("sumTimeRing1p5", &sumTimeRing1p5 ,"sumTimeRing1p5/D" );
+
+  genParticleTree->Branch("avgTimeRing0p4", &avgTimeRing0p4 ,"avgTimeRing0p4/D" );
+  genParticleTree->Branch("avgTimeRing0p7", &avgTimeRing0p7 ,"avgTimeRing0p7/D" );
+  genParticleTree->Branch("avgTimeRing0p8", &avgTimeRing0p8 ,"avgTimeRing0p8/D" );
+  genParticleTree->Branch("avgTimeRing0p9", &avgTimeRing0p9 ,"avgTimeRing0p9/D" );
+  genParticleTree->Branch("avgTimeRing1p0", &avgTimeRing1p0 ,"avgTimeRing1p0/D" );
+  genParticleTree->Branch("avgTimeRing1p1", &avgTimeRing1p1 ,"avgTimeRing1p1/D" );
+  genParticleTree->Branch("avgTimeRing1p2", &avgTimeRing1p2 ,"avgTimeRing1p2/D" );
+  genParticleTree->Branch("avgTimeRing1p3", &avgTimeRing1p3 ,"avgTimeRing1p3/D" );
+  genParticleTree->Branch("avgTimeRing1p4", &avgTimeRing1p4 ,"avgTimeRing1p4/D" );
+  genParticleTree->Branch("avgTimeRing1p5", &avgTimeRing1p5 ,"avgTimeRing1p5/D" );
+
+  genParticleTree->Branch("nHitsCluster", &nHitsCluster ,"nHitsCluster/D" );
+  genParticleTree->Branch("nHitsRing0p4", &nHitsRing0p4 ,"nHitsRing0p4/D" );
+  genParticleTree->Branch("nHitsRing0p7", &nHitsRing0p7 ,"nHitsRing0p7/D" );
+  genParticleTree->Branch("nHitsRing0p8", &nHitsRing0p8 ,"nHitsRing0p8/D" );
+  genParticleTree->Branch("nHitsRing0p9", &nHitsRing0p9 ,"nHitsRing0p9/D" );
+  genParticleTree->Branch("nHitsRing1p0", &nHitsRing1p0 ,"nHitsRing1p0/D" );
+  genParticleTree->Branch("nHitsRing1p1", &nHitsRing1p1 ,"nHitsRing1p1/D" );
+  genParticleTree->Branch("nHitsRing1p2", &nHitsRing1p2 ,"nHitsRing1p2/D" );
+  genParticleTree->Branch("nHitsRing1p3", &nHitsRing1p3 ,"nHitsRing1p3/D" );
+  genParticleTree->Branch("nHitsRing1p4", &nHitsRing1p4 ,"nHitsRing1p4/D" );
+  genParticleTree->Branch("nHitsRing1p5", &nHitsRing1p5 ,"nHitsRing1p5/D" );
+    
 }
 //destructor
 L1MTDLLPAnalyzer::~L1MTDLLPAnalyzer()
@@ -246,10 +362,11 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 {
 
   edm::ESHandle<MTDGeometry> geom;
-  if( geom_ == nullptr ) {
+  //if( geom_ == nullptr ) {
     iSetup.get<MTDDigiGeometryRecord>().get(geom);
     geom_ = geom.product();
-  }
+    std::cout<<"got geometry"<<std::endl;
+    //}
 
   edm::Handle<BTLDigiCollection> h_BTL_digi;
   iEvent.getByToken(btlDigisToken_,h_BTL_digi);
@@ -395,22 +512,142 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
   } // if ( h_BTL_reco->size() > 0 )
 
-  std::cout<<"number of btl_hits "<<btl_hits.size()<<std::endl;
+  //// hep mc info
+
+   edm::Handle<edm::HepMCProduct> HepMCHandle;
+   iEvent.getByToken( HepMCProductToken_, HepMCHandle) ;
+   const HepMC::GenEvent* Evt = HepMCHandle->GetEvent() ;
+   //
+   // this is an example loop over the hierarchy of vertices
+   //
+   int i = 0;
+   float timeGenLLP = 0;
+   TVector3 MuonVertex;
+   for ( HepMC::GenEvent::vertex_const_iterator
+	   itVtx=Evt->vertices_begin(); itVtx!=Evt->vertices_end(); ++itVtx )
+     {
+       i++;
+       int j = 0; 
+       for ( HepMC::GenVertex::particles_out_const_iterator
+	       itPartOut=(*itVtx)->particles_out_const_begin();
+	     itPartOut!=(*itVtx)->particles_out_const_end(); ++itPartOut )
+	 {
+	   //time = (*itPartOut)->momentum().t();
+	   ////energy = (*itPartOut)->momentum().et();
+	   //mass = (*itPartOut)->momentum().m();
+	   //px = (*itPartOut)->momentum().px();
+	   //py = (*itPartOut)->momentum().py();
+	   //eta = (*itPartOut)->momentum().eta();
+	   //phi = (*itPartOut)->momentum().phi();
+	   //genTree->Fill();
+	   if((*itPartOut)->pdg_id()==1000013){
+	   //if(j<20)
+	   //std::cout<< "pdgID: "<<(*itPartOut)->pdg_id() <<" mass: "<< (*itPartOut)->momentum().m()<< " px: "<<(*itPartOut)->momentum.px() <<" time: "<<time<<std::endl;
+	   //double time = (*itPartOut)->production_vertex()->point3d().x();
+	     const HepMC::GenParticle* pf = GetFinal(*itPartOut); // inlcude mixing
+	   if((*itPartOut)->production_vertex() && (*itPartOut)->end_vertex()){
+	     TVector3 PV((*itPartOut)->production_vertex()->point3d().x(),(*itPartOut)->production_vertex()->point3d().y(),(*itPartOut)->production_vertex()->point3d().z()); 
+	     TVector3 SV((*itPartOut)->end_vertex()->point3d().x(),(*itPartOut)->end_vertex()->point3d().y(),(*itPartOut)->end_vertex()->point3d().z()); 
+	     TVector3 DL=SV-PV; 
+	     double c(2.99792458E8),Ltau(DL.Mag()/100)/*cm->m*/,beta((*itPartOut)->momentum().rho()/(*itPartOut)->momentum().m()); 
+	     double lt=Ltau/(c*beta);
+	     //if(lt>1E-16)lifetime_init->Fill(log10(lt),weight);
+	     if(pf->end_vertex()){
+	       TVector3 SVf(pf->end_vertex()->point3d().x(),pf->end_vertex()->point3d().y(),pf->end_vertex()->point3d().z());
+	       DL=SVf-PV;
+	       Ltau=DL.Mag()/100;
+	       lt=Ltau/(c*beta);
+
+	       std::cout<<"LTau "<<Ltau<<" lifetime "<<lt<<std::endl;
+	       timeGenLLP = lt;
+	       //if(lt>1E-16)lifetime_final->Fill(log10(lt),weight);
+	     }
+	   }
+	   //j++;
+	 }
+     }
+     }
+   std::cout<<"n HepMC Vertices: "<<i<<std::endl;
+
+
+  //// end hep mc info
+
+    edm::Handle<GenParticleCollectionType> genParticles_;
+    if(!iEvent.getByToken(genToken_,genParticles_))
+      std::cout<<"No gen Particles Found "<<std::endl;
+    else
+      std::cout<<"Gen Particles size "<<genParticles_->size()<<std::endl;
+
+    GenParticleCollectionType motherParticles;
+    motherParticles.clear();
+    //find gen mother particle
+    int pdgID_mother = 1000013;
+    //std::cout<<"Number of Daughters for PDGID "<<pdgID_mother<<" : "<<genParticles_->at(0).daughter(0)->pdgId()<<std::endl;   
+    //for(const auto genParticle : genParticles_){
+    std::vector<const reco::Candidate*> theMuons;
+    for(int i = 0; i < genParticles_->size(); i++){
+      reco::GenParticle genParticle = genParticles_->at(i);
+      if(genParticle.pdgId()==pdgID_mother){
+	motherParticles.push_back(genParticle);
+	std::cout<<"Number of Daughters for PDGID "<<pdgID_mother<<" : "<<genParticle.numberOfDaughters()<<" First Daughter PDGID: "<<genParticles_->at(i).daughter(0)->pdgId()<<std::endl;
+	if(genParticle.numberOfDaughters()>1){
+	  std::cout<<"Second Daughter PDGID: "<<genParticles_->at(i).daughter(1)->pdgId()<< " pt: "<< genParticles_->at(i).daughter(1)->pt() <<" eta: "<< genParticles_->at(i).daughter(1)->eta() <<" phi: "<< genParticles_->at(i).daughter(1)->phi() <<std::endl;
+	  if(genParticles_->at(i).daughter(1)->pdgId()==13){
+	    theMuons.push_back(genParticles_->at(i).daughter(1));
+	  }
+	}	
+      }
+    }
+
+    genPt = -10;    
+    genEta = -10;
+    genPhi = -10;   
+    genEnergy = -10;
+    genPdgId = -10; 
+    matchedClusterTime = -10;
+    eventAvgTime = -10;
+
+    sumMatchedClusterTime = 0;
+    nHitsCluster = 0;
+
+    sumTimeRing0p4 = -10;
+    sumTimeRing0p7 = -10;
+    sumTimeRing0p8 = -10;
+    sumTimeRing0p9 = -10;
+    sumTimeRing1p0 = -10;
+    sumTimeRing1p1 = -10;
+    sumTimeRing1p2 = -10;
+    sumTimeRing1p3 = -10;
+    sumTimeRing1p4 = -10;
+    sumTimeRing1p5 = -10;
+
+    nHitsRing0p4 = 0;
+    nHitsRing0p7 = 0;
+    nHitsRing0p8 = 0;
+    nHitsRing0p9 = 0;
+    nHitsRing1p0 = 0;
+    nHitsRing1p1 = 0;
+    nHitsRing1p2 = 0;
+    nHitsRing1p3 = 0;
+    nHitsRing1p4 = 0;
+    nHitsRing1p5 = 0;
+
+    std::cout<<"number of btl_hits "<<btl_hits.size()<<std::endl;
+
     for (auto const& hit: btl_hits) {
-      
       BTLDetId detId(hit.first); 
-      
+
       DetId geoId = BTLDetId(detId.mtdSide(),detId.mtdRR(),detId.module()+14*(detId.modType()-1),0,1);
+
       const MTDGeomDet* thedet = geom_->idToDet(geoId);
+
       const ProxyMTDTopology& topoproxy = static_cast<const ProxyMTDTopology&>(thedet->topology());
       const RectangularMTDTopology& topo = static_cast<const RectangularMTDTopology&>(topoproxy.specificTopology());
-      
       if ( (hit.second).reco_energy < btlMinEnergy_ ) continue;
-
+      
       Local3DPoint simscaled(0.1*(hit.second).sim_x,0.1*(hit.second).sim_y,0.1*(hit.second).sim_z);
       simscaled = topo.pixelToModuleLocalPoint(simscaled,detId.row(topo.nrows()),detId.column(topo.nrows()));
       const auto& global_pos = thedet->toGlobal(simscaled);
-      
       eta          = (double)global_pos.eta();
       phi          = (double)global_pos.phi();
       x            = (double)global_pos.x();
@@ -419,10 +656,124 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
       time         = (double)(hit.second).reco_time;
       //timeError    = (double);
       energy       = (double)(hit.second).reco_energy;
+      for(auto theMuon : theMuons){
+	if(fabs(theMuon->eta()-eta)<0.05&&fabs(theMuon->phi()-phi)<0.05){
+	  std::cout<<"Matched time: "<<time<< " eta: "<< eta<< " phi: "<< phi<<std::endl;
+	  sumMatchedClusterTime += time;
+	  nHitsCluster++;
+	}
+      }
       
+      //ring 0
+      if(fabs(eta)<0.4){
+	sumTimeRing0p4 += time;
+	nHitsRing0p4++;
+      }
+      //ring 1
+      if(fabs(eta)>0.4&&fabs(eta)<0.7){
+	sumTimeRing0p7 += time;
+	nHitsRing0p7++;
+      }
+      //ring 2
+      if(fabs(eta)>0.7&&fabs(eta)<0.8){
+	sumTimeRing0p8 += time;
+	nHitsRing0p8++;
+      }
+      if(fabs(eta)>0.8&&fabs(eta)<0.9){
+	sumTimeRing0p9 += time;
+	nHitsRing0p9++;
+      }
+      if(fabs(eta)>0.9&&fabs(eta)<1.0){
+	sumTimeRing1p0 += time;
+	nHitsRing1p0++;
+      }
+      if(fabs(eta)>1.0&&fabs(eta)<1.1){
+	sumTimeRing1p1 += time;
+	nHitsRing1p1++;
+      }
+      if(fabs(eta)>1.1&&fabs(eta)<1.2){
+	sumTimeRing1p2 += time;
+	nHitsRing1p2++;
+      }
+      if(fabs(eta)>1.2&&fabs(eta)<1.3){
+	sumTimeRing1p3 += time;
+	nHitsRing1p3++;
+      }
+      if(fabs(eta)>3.0&&fabs(eta)<1.4){
+	sumTimeRing1p4 += time;
+	nHitsRing1p4++;
+      }
+      if(fabs(eta)>1.4&&fabs(eta)<1.5){
+	sumTimeRing1p5 += time;
+	nHitsRing1p5++;
+      }
+
       digiTree->Fill();
     }
-  
+    //std::cout<<"average time in eta ring: "<<sumtime/nhits_eta<<std::endl;
+    for(auto mu : theMuons){
+      genPt = mu->pt();    
+      genEta = mu->eta();
+      genPhi = mu->phi();   
+      genEnergy = mu->energy();
+      genPdgId = 13; 
+      
+    matchedClusterTime = sumMatchedClusterTime/nHitsCluster;
+    
+    eventAvgTime = -10;
+
+    if(nHitsRing0p4>0)
+      avgTimeRing0p4 = sumTimeRing0p4/nHitsRing0p4;
+    if(nHitsRing0p7>0)
+      avgTimeRing0p7 = sumTimeRing0p7/nHitsRing0p7;
+    if(nHitsRing0p8>0)
+      avgTimeRing0p8 = sumTimeRing0p8/nHitsRing0p8;
+    if(nHitsRing0p9>0)
+      avgTimeRing0p9 = sumTimeRing0p9/nHitsRing0p9;
+
+    if(nHitsRing1p0>0)
+      avgTimeRing1p0 = sumTimeRing1p0/nHitsRing1p0;
+    if(nHitsRing1p1>0)
+      avgTimeRing1p1 = sumTimeRing1p1/nHitsRing1p1;
+    if(nHitsRing1p2>0)
+      avgTimeRing1p2 = sumTimeRing1p2/nHitsRing1p2;
+    if(nHitsRing1p3>0)
+      avgTimeRing1p3 = sumTimeRing1p3/nHitsRing1p3;
+    if(nHitsRing1p4>0)
+      avgTimeRing1p4 = sumTimeRing1p4/nHitsRing1p4;
+    if(nHitsRing1p5>0)
+      avgTimeRing1p5 = sumTimeRing1p5/nHitsRing1p5;
+
+  }
+    
+  genParticleTree->Fill();
+    //find number of daughter particles
+    /*
+    for(auto mother : motherParticles){
+      std::vector<reco::Candidate*> daughterParticles;
+      daughterParticles.clear();
+      int nDaughters =  mother.numberOfDaughters();
+      for(int i = 0; i < nDaughters; i++){
+	if((mother).daughter(i)->status()==2){
+	  daughterParticles.push_back(mother.daughter(i));
+	}
+      }
+      std::cout<<"Number of final state daughters: "<<daughterParticles.size()<<std::endl;
+    }
+    */
+    //determine decayed or not decayed
+
+    //sum pT
+
+    //match to muon
+
+
+    //find gen daughter particles
+
+
+    //
+
+
 
 }
 
