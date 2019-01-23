@@ -102,7 +102,6 @@ private:
   //EDGetTokenT< FTLClusterCollection > etlClusterToken_;
 
   double time_cut_;
-
   InputTag genSrc_;
 
   double genPt, genEta, genPhi;
@@ -139,10 +138,16 @@ L1MTDGenAnalyzer::L1MTDGenAnalyzer(const edm::ParameterSet &cfg) :
   //btlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterBarrel"))),
   //etlClusterToken_(    consumes< FTLClusterCollection > ( cfg.getParameter<InputTag>("mtdClusterEndcap"))),
   //HepMCProductToken_(    consumes< edm::HepMCProduct >    ( cfg.getParameter<InputTag>("HepMCProduct"))),
-  genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles"))),
-  time_cut_(           cfg.getParameter<double>("time_cut"))
+
+  // Commented out BBT, 01-17-19
+  time_cut_(           cfg.getParameter<double>("time_cut")),
+  genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles")))
+  //time_cut_(           cfg.getParameter<double>("time_cut"))
 {
 
+  //genSrc_ ((           cfg.getParameter<edm::InputTag>( "genParticles")));
+  //time_cut_(           cfg.getParameter<double>("time_cut"));
+    
     //services
   usesResource("TFileService");
   genToken_ =     consumes<std::vector<reco::GenParticle> >(genSrc_);

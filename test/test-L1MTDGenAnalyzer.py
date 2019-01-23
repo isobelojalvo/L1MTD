@@ -33,13 +33,16 @@ process.load("Geometry.MTDGeometryBuilder.mtdParameters_cfi")
 process.mtdGeometry.applyAlignment = cms.bool(False)
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(4000)
+    #input = cms.untracked.int32(4000)
+    input = cms.untracked.int32(40)
 )
 
 # Input source
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
-        "file:iDM_Mchi-5p25_dMchi-0p5_mZDinput-15p0_ctau-0_39826787_AOD_ctau-100.root"
+        #"file:iDM_Mchi-5p25_dMchi-0p5_mZDinput-15p0_ctau-0_39826787_AOD_ctau-100.root"
+        "file:/eos/uscms/store/user/benjtann/MTD_LLP/DisplacedSUSY_StopToBL_M-300/DisplacedSUSY_StopToBL_M-300_CTau-1-gen-sim.root"
+
         #"/store/mc/PhaseIIMTDTDRAutumn18DR/DYToLL_M-50_14TeV_pythia8/GEN-SIM-RECO/PU200_pilot_103X_upgrade2023_realistic_v2_ext2-v2/00000/FA39381B-9BBC-8C4A-90B8-A28CF803D044.root"
         #"file:DisplacedSUSY_StopToBL_M-300_CTau-1000-gen-sim-digi-raw-20.root"
         #"file:/hdfs/store/user/ojalvo/Timing-Samples/DYLL-200PU/DYll-gen-sim-raw-reco.root"
