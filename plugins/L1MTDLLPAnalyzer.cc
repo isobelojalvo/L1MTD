@@ -493,7 +493,6 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
     }
   }
 
-  std::cout<<"l1Taus size "<<l1Taus->size()<<std::endl;
   for(const auto& l1object : *l1Taus){
     std::cout<<"x: "<<l1object.p4().x()<<std::endl;
     std::cout<<"y: "<<l1object.p4().y()<<std::endl;
@@ -686,9 +685,7 @@ L1MTDLLPAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetu
 
    if(!iEvent.getByToken(genToken_,genParticles_))
      std::cout<<"No gen Particles Found "<<std::endl;
-   else
-     std::cout<<"Gen Particles size "<<genParticles_->size()<<std::endl;
-   
+    
    GenParticleCollectionType motherParticles;
    int pdgID_mother = 1000013;
    std::vector<const reco::Candidate*> theMuons;
